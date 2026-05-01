@@ -1,0 +1,284 @@
+/* ==========================================================================
+   贪吃蛇 Snake — Dark Neon 主题样式
+   ========================================================================== */
+
+/* @import 必须位于所有其他 CSS 规则之前 */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600&display=swap');
+
+/* --- 全局重置 & 字体 --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    /* 背景微纹理 */
+    background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(0, 255, 65, 0.03) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 100%, rgba(255, 0, 68, 0.03) 0%, transparent 60%);
+}
+
+/* --- 游戏主容器 --- */
+#game-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    user-select: none;
+}
+
+/* ==========================================================================
+   顶部分数面板
+   ========================================================================== */
+#score-panel {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    background: rgba(17, 17, 17, 0.95);
+    border: 1px solid #1a1a1a;
+    border-radius: 12px;
+    padding: 12px 32px;
+    box-shadow:
+        0 0 20px rgba(0, 255, 65, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.score-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.score-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #555;
+    text-transform: uppercase;
+}
+
+.score-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: #00ff41;
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+    letter-spacing: 2px;
+    min-width: 72px;
+    text-align: center;
+}
+
+.score-value.high {
+    color: #ff0044;
+    text-shadow: 0 0 10px rgba(255, 0, 68, 0.4);
+}
+
+.score-divider {
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, #333, transparent);
+}
+
+/* ==========================================================================
+   Canvas 容器
+   ========================================================================== */
+#canvas-container {
+    position: relative;
+    width: 400px;
+    height: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+        0 0 40px rgba(0, 255, 65, 0.08),
+        0 0 80px rgba(0, 0, 0, 0.5),
+        inset 0 0 60px rgba(0, 0, 0, 0.3);
+    border: 1px solid #1a1a1a;
+}
+
+#game-canvas {
+    display: block;
+    width: 400px;
+    height: 400px;
+    background: #111;
+}
+
+/* ==========================================================================
+   覆盖层 (Overlays) — 开始 / 暂停 / 游戏结束
+   ========================================================================== */
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: opacity 0.3s ease;
+    z-index: 10;
+}
+
+.overlay.hidden {
+    display: none;
+    opacity: 0;
+}
+
+.overlay-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.overlay-content h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 32px;
+    font-weight: 900;
+    color: #00ff41;
+    text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+    letter-spacing: 4px;
+}
+
+/* 蛇图标动画 */
+.snake-icon {
+    font-size: 64px;
+    animation: snakeFloat 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.3));
+}
+
+@keyframes snakeFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.overlay-hint {
+    font-size: 14px;
+    color: #888;
+    margin-top: 8px;
+}
+
+.overlay-controls {
+    font-size: 12px;
+    color: #555;
+    margin-top: 4px;
+}
+
+/* --- KBD 按键样式 --- */
+kbd {
+    display: inline-block;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: #aaa;
+    margin: 0 2px;
+    box-shadow: 0 2px 0 #111;
+}
+
+/* ==========================================================================
+   游戏结束面板
+   ========================================================================== */
+.gameover-panel {
+    background: rgba(17, 17, 17, 0.95);
+    border: 1px solid #ff0044;
+    border-radius: 16px;
+    padding: 32px 48px;
+    box-shadow: 0 0 40px rgba(255, 0, 68, 0.15);
+    animation: panelIn 0.35s ease-out;
+}
+
+.gameover-panel h1 {
+    color: #ff0044;
+    text-shadow: 0 0 20px rgba(255, 0, 68, 0.5);
+}
+
+@keyframes panelIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.final-score {
+    margin: 16px 0 8px;
+}
+
+.final-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: #555;
+    text-transform: uppercase;
+}
+
+.final-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 56px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+    letter-spacing: 4px;
+}
+
+/* --- 新纪录徽章 --- */
+.new-record {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffd700;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+    animation: recordPulse 1s ease-in-out infinite;
+    margin-bottom: 8px;
+}
+
+.new-record.hidden {
+    display: none;
+}
+
+@keyframes recordPulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* ==========================================================================
+   响应式微调
+   ========================================================================== */
+@media (max-width: 480px) {
+    #canvas-container,
+    #game-canvas {
+        width: 320px;
+        height: 320px;
+    }
+    .overlay-content h1 {
+        font-size: 24px;
+    }
+    .final-value {
+        font-size: 40px;
+    }
+    #score-panel {
+        padding: 8px 16px;
+        gap: 16px;
+    }
+    .score-value {
+        font-size: 22px;
+    }
+}

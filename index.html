@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐍 贪吃蛇 Snake</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-wrapper">
+        <!-- 顶部面板：分数显示 -->
+        <div id="score-panel">
+            <div class="score-item">
+                <span class="score-label">SCORE</span>
+                <span id="current-score" class="score-value">000</span>
+            </div>
+            <div class="score-divider"></div>
+            <div class="score-item">
+                <span class="score-label">HIGH</span>
+                <span id="high-score" class="score-value high">000</span>
+            </div>
+        </div>
+
+        <!-- Canvas 游戏区域 -->
+        <div id="canvas-container">
+            <canvas id="game-canvas" width="400" height="400"></canvas>
+
+            <!-- 开始界面覆盖层 -->
+            <div id="start-overlay" class="overlay">
+                <div class="overlay-content">
+                    <div class="snake-icon">🐍</div>
+                    <h1>贪吃蛇</h1>
+                    <p class="overlay-hint">Press <kbd>SPACE</kbd> or Click to Start</p>
+                    <p class="overlay-controls">
+                        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Arrow Keys to move
+                    </p>
+                </div>
+            </div>
+
+            <!-- 暂停覆盖层 -->
+            <div id="pause-overlay" class="overlay hidden">
+                <div class="overlay-content">
+                    <h1>⏸ PAUSED</h1>
+                    <p class="overlay-hint">Press <kbd>P</kbd> or <kbd>ESC</kbd> to Resume</p>
+                </div>
+            </div>
+
+            <!-- 游戏结束覆盖层 -->
+            <div id="gameover-overlay" class="overlay hidden">
+                <div class="overlay-content gameover-panel">
+                    <h1>💀 GAME OVER</h1>
+                    <div class="final-score">
+                        <p class="final-label">FINAL SCORE</p>
+                        <p id="final-score-value" class="final-value">0</p>
+                    </div>
+                    <div class="new-record hidden" id="new-record-badge">🏆 NEW RECORD!</div>
+                    <p class="overlay-hint">Press <kbd>SPACE</kbd> to Restart</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
