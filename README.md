@@ -1,10 +1,12 @@
 # 🐍 贪吃蛇 Snake — 全栈增强版
 
-> **前端**：HTML5 Canvas + CSS3 (Dark Neon主题) + Vanilla JS (ES6+)
+> **前端**：TypeScript 5.7+ + Vite 6+ (HTML5 Canvas + CSS3 Dark Neon 主题)
 >
 > **后端**：Node.js + Express + SQLite (sql.js — 纯 JS，无需原生编译)
 >
-> **零前端依赖** — 无需任何外部库或框架，纯浏览器原生 API 实现
+> **架构**：有限状态机 (FSM) 驱动游戏流程 / A* AI 自动驾驶 / 全球排行榜
+>
+> **零运行时依赖** — 编译产物为纯静态文件，无需任何外部库
 
 ---
 
@@ -159,18 +161,85 @@ Layer 4: 洪泛逃生 → 选最大连通方向
 
 ## 🚀 部署方式
 
-### 方式一：纯前端（离线游玩）
+### 方式一：TypeScript + Vite 开发模式（推荐）
+
+需要 **Node.js 18+** 环境。
 
 ```bash
-# 克隆或下载项目到本地
-git clone <repo-url>
+# 1. 安装依赖
+cd client
+npm install
 
-# 直接用浏览器打开 index.html
+# 2. 启动 Vite 开发服务器（默认端口 8080）
+npm run dev
+
+# 3. 另一个终端 — 启动后端服务（需要排行榜功能）
+cd ../server
+npm install
+npm start
+
+# 4. 访问 http://localhost:8080
+#    前端通过 Vite proxy 自动转发 /api/ → localhost:3001
+```
+
+**可用命令：**
+| 命令 | 说明 |
+|------|------|
+| `npm run dev` | 启动 Vite 开发服务器 (热更新) |
+| `npm run build` | TypeScript 编译 + Vite 构建到 `client/dist/` |
+| `npm run preview` | 预览生产构建 |
+| `npm run typecheck` | 类型检查 (`tsc --noEmit`) |
+
+### 方式二：纯前端（离线游玩，传统 JS 版）
+
+```bash
+# 直接用浏览器打开 index.html（根目录传统版）
 # 游戏核心功能完全离线可用（排行榜除外）
 ```
 
-> **注意**：Service Worker (PWA) 需要 HTTP(S) 协议才能注册。
-> 本地直接用 `file://` 打开时，PWA 缓存功能不可用，但游戏本身正常运行。
+> **注意**：传统版 `game.js` 仍保留在根目录，`client/` 为 TypeScript + Vite 重构版。
+> Service Worker (PWA) 需要 HTTP(S) 协议才能注册。
+
+### 方式三：完整全栈（传统 JS 版，含排行榜）
+
+需要 **Node.js 18+** 环境。
+
+```bash
+# 1. 安装后端依赖
+cd server
+npm install
+
+# 2. 启动后端服务（默认端口 3001）
+npm start
+
+# 3. 启动前端静态服务（另一个终端）
+cd ..   # 回到项目根目录
+npx http-server ./ -p 8080 -c-1
+# 或使用 VS Code Live Server
+
+# 4. 访问 http://localhost:8080
+# 排行榜将自动连接 http://localhost:3001
+```
+
+### 方式四：TypeScript + Vite 生产构建（Nginx）
+
+```bash
+cd client
+npm install
+npm run build       # 输出到 client/dist/
+
+# 将 dist/ 目录部署到任何静态服务器（Nginx, Netlify, Vercel 等）
+```
+
+| 组件 | 推荐平台 | 说明 |
+|------|---------|------|
+| 前端 (`client/dist/`) | Netlify / Vercel / GitHub Pages | 纯静态文件 |
+| 后端 (`server/`) | Render / Railway / Fly.io | Node.js API 服务 |
+
+> 生产部署时，若前后端不同源，需配置 CORS 或在 Nginx 侧添加反向代理规则。
+> [`Network.ts`](client/src/Network.ts:16) 已自动适配：通过 HTTP 访问时使用相对路径 `/api`（反向代理模式），直接打开时使用 `localhost:3001`。
+
+### 方式五：Docker Compose（本地容器化）
 
 ### 方式二：完整全栈（推荐，含排行榜）
 
@@ -203,7 +272,7 @@ npx http-server ./ -p 8080 -c-1
 > 生产部署时，若前后端不同源，需配置 CORS 或在 Nginx 侧添加反向代理规则。
 > [`game.js`](game.js:30) 的 `API_BASE_URL` 已自动适配：通过 HTTP 访问时使用相对路径 `/api`（反向代理模式），直接打开时使用 `localhost:3001`。
 
-### 方式四：Docker Compose（本地容器化）
+### 方式六：Docker Compose（本地容器化）
 
 需要 **Docker Engine 24+** 和 **Docker Compose v2**（通常已内置）。
 
@@ -252,7 +321,7 @@ docker compose restart backend      # 仅重启后端
 docker compose build --no-cache     # 强制重建镜像
 ```
 
-### 方式五：K3s / Kubernetes（生产集群）
+### 方式七：K3s / Kubernetes（生产集群）
 
 需要 **K3s 1.19+** 或 **Kubernetes 1.19+** 集群。
 
@@ -330,18 +399,31 @@ kubectl get svc snake-frontend
 
 ```
 snake/
-├── index.html              # 入口 HTML — 游戏界面 + 排行榜面板
-├── style.css               # Dark Neon 主题样式 + 响应式适配
-├── game.js                 # 核心游戏逻辑 (≈1650 行)
-│   ├─ Constants            # 网格/速度/状态常量
-│   ├─ AudioManager         # Web Audio API 8-bit 音效
-│   ├─ Particle             # 粒子特效
-│   ├─ InputHandler         # 键盘/触控 + 指令队列
-│   ├─ Snake                # 蛇管理（穿墙/反转）
-│   ├─ Item                 # 道具系统（4 种类型）
-│   └─ Game                 # 主控制器（状态机/循环/特效/排行榜 API）
-├── ai.js                   # AI 自动驾驶 (≈400 行)
-│   └─ AIPlayer             # A* 寻路 + 虚拟预演 + 追尾 + 洪泛
+├── client/                 # 🆕 TypeScript + Vite 重构版前端
+│   ├── index.html          #   Vite 入口 HTML
+│   ├── package.json        #   Vite + TypeScript 依赖
+│   ├── tsconfig.json       #   严格模式 TS 配置
+│   ├── vite.config.ts      #   Vite 配置（:8080 + /api 代理）
+│   ├── src/
+│   │   ├── main.ts         #   入口 — 创建 Game 实例
+│   │   ├── types.ts        #   所有接口/枚举 (Point, Direction, GameState...)
+│   │   ├── constants.ts    #   网格/道具/颜色常量
+│   │   ├── GameStateMachine.ts  #   有限状态机 (FSM)
+│   │   ├── Snake.ts        #   蛇管理（移动/碰撞/绘制）
+│   │   ├── InputHandler.ts #   键盘/触控 + 指令队列
+│   │   ├── AudioManager.ts #   Web Audio API 8-bit 音效
+│   │   ├── Particle.ts     #   粒子特效系统
+│   │   ├── Item.ts         #   道具系统（4 种类型）
+│   │   ├── AIController.ts #   AI 4 层决策树 (A* + 预演 + 追尾 + 洪泛)
+│   │   ├── Network.ts      #   排行榜 REST API 封装
+│   │   ├── Game.ts         #   主控制器 (FSM + 循环 + DOM + 排行榜)
+│   │   ├── style.css       #   Dark Neon 主题
+│   │   └── vite-env.d.ts   #   Vite 类型声明
+│   └── dist/               #   构建产物 (npm run build)
+├── index.html              # 传统 JS 版入口（保留）
+├── style.css               # 传统 JS 版样式（保留）
+├── game.js                 # 传统 JS 版游戏逻辑（保留）
+├── ai.js                   # 传统 JS 版 AI 自动驾驶（保留）
 ├── manifest.json           # PWA 清单
 ├── sw.js                   # Service Worker 缓存策略
 ├── nginx.conf              # Nginx 配置（反向代理 /api/ → 后端）
@@ -386,16 +468,17 @@ _render()                 ← 每帧视觉渲染（独立于更新频率）
 ### 核心类关系
 
 ```
+
 Game ────┬─── Snake          — 蛇的位置/方向/碰撞/绘制
          ├─── Item           — 道具生成/类型/绘制
          ├─── InputHandler   — 键盘/触控事件 + 队列缓冲
          ├─── AudioManager   — Web Audio API 音效合成
-         ├─── AIPlayer       — AI 决策（4 层树）
-         ├─── particles[]    — 粒子特效列表
-         ├─── effects[]      — 计时效果管理器
-         └─── fetch()        — 排行榜 API 通信
+         ├─── AIController   — AI 决策（4 层树）
+         ├─── ParticleSystem — 粒子特效
+         ├─── GameStateMachine— FSM 状态机 (MENU→PLAYING→PAUSED/GAME_OVER)
+         ├─── Network        — 排行榜 REST API 封装
+         └─── effects[]      — 计时效果管理器
 ```
-
 ---
 
 ## 🌐 API 文档

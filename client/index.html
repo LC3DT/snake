@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+  <title>🐍 Snake — 贪吃蛇</title>
+</head>
+<body>
+  <div id="game-wrapper">
+    <!-- ====== 顶部面板 ====== -->
+    <div id="score-panel">
+      <div class="score-item">
+        <span class="score-label">SCORE</span>
+        <span class="score-value" id="current-score">0</span>
+      </div>
+      <div class="score-item">
+        <span class="score-label">HIGH</span>
+        <span class="score-value" id="high-score">0</span>
+      </div>
+      <div class="score-item">
+        <span class="score-label">SPEED</span>
+        <span class="score-value" id="speed-level">1</span>
+      </div>
+      <div class="score-item toggle-item">
+        <label class="toggle-switch" title="穿墙模式">
+          <input type="checkbox" id="wrap-toggle" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">🔁</span>
+      </div>
+      <div class="score-item" id="ai-status">AI OFF</div>
+    </div>
+
+    <!-- ====== 游戏区域 ====== -->
+    <div id="play-area">
+      <div id="canvas-container">
+        <!-- 道具图例 -->
+        <div id="item-legend" class="legend">
+          <span class="legend-item" style="color:#ff0044">🍎</span>
+          <span class="legend-item" style="color:#ffd700">⭐</span>
+          <span class="legend-item" style="color:#00bfff">💧</span>
+          <span class="legend-item" style="color:#bf00ff">☠️</span>
+        </div>
+
+        <!-- 开始覆盖层 -->
+        <div id="start-overlay" class="overlay">
+          <div class="overlay-content">
+            <h1 class="game-title">SNAKE</h1>
+            <p class="start-hint">Press <kbd>Space</kbd> to Start</p>
+            <p class="start-subtitle">or tap on mobile</p>
+            <div class="overlay-items">
+              <div class="item-card">
+                <span class="item-icon" style="color:#ff0044">🍎</span>
+                <span class="item-desc">+10</span>
+              </div>
+              <div class="item-card">
+                <span class="item-icon" style="color:#ffd700">⭐</span>
+                <span class="item-desc">+50</span>
+              </div>
+              <div class="item-card">
+                <span class="item-icon" style="color:#00bfff">💧</span>
+                <span class="item-desc">Slow</span>
+              </div>
+              <div class="item-card">
+                <span class="item-icon" style="color:#bf00ff">☠️</span>
+                <span class="item-desc">Flip</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 暂停覆盖层 -->
+        <div id="pause-overlay" class="overlay hidden">
+          <div class="overlay-content">
+            <h2>PAUSED</h2>
+            <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to Resume</p>
+          </div>
+        </div>
+
+        <!-- 游戏结束覆盖层 -->
+        <div id="gameover-overlay" class="overlay hidden">
+          <div class="overlay-content gameover-panel">
+            <h2>GAME OVER</h2>
+            <div class="final-score">
+              <span>Score: </span><span id="final-score-value">0</span>
+            </div>
+            <div id="new-record-badge" class="new-record hidden">🏆 NEW RECORD!</div>
+
+            <!-- 分数提交区域 -->
+            <div id="score-submit-area" class="score-submit-area hidden">
+              <div class="submit-row">
+                <input type="text" id="player-name-input"
+                       class="name-input" placeholder="Enter name"
+                       maxlength="10" autocomplete="off" />
+                <button id="submit-score-btn" class="neon-btn submit-btn">SUBMIT</button>
+              </div>
+              <p class="submit-hint">3-10 chars (letters, digits, underscore)</p>
+            </div>
+            <div id="submit-success" class="submit-success hidden">✅ Score submitted!</div>
+
+            <p class="restart-hint">Press <kbd>Space</kbd> to Restart</p>
+          </div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="game-canvas"></canvas>
+      </div>
+
+      <!-- ====== 排行榜面板 ====== -->
+      <div id="leaderboard-panel" class="leaderboard-panel">
+        <div class="leaderboard-header">
+          <span class="leaderboard-title">🏆 LEADERBOARD</span>
+          <button id="refresh-leaderboard-btn" class="neon-btn refresh-btn" title="Refresh">⟳</button>
+        </div>
+        <div id="leaderboard-body" class="leaderboard-body">
+          <div class="leaderboard-loading">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用 Vite 的模块入口 -->
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -36,10 +36,10 @@ services:
       retries: 3
       start_period: 10s
 
-  # ---- 前端服务 ----
+  # ---- 前端服务（TypeScript + Vite 版） ----
   frontend:
     build:
-      context: .
+      context: ./client
       dockerfile: Dockerfile
     container_name: snake-frontend
     restart: unless-stopped

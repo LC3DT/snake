@@ -1,0 +1,527 @@
+/* ===========================================================================
+   🐍 Snake — Dark Neon 主题样式
+   复制自根目录 style.css，保持视觉一致
+   =========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a0a;
+  font-family: 'Inter', sans-serif;
+  color: #e0e0e0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* ====== 布局 ====== */
+#game-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 10px;
+  gap: 8px;
+}
+
+#play-area {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+#canvas-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* ====== 顶部面板 ====== */
+#score-panel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 560px;
+  width: 100%;
+}
+
+.score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.score-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  color: #666;
+  letter-spacing: 2px;
+}
+
+.score-value {
+  font-family: 'Orbitron', monospace;
+  font-size: 18px;
+  color: #00ff41;
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+/* ====== 穿墙切换 ====== */
+.toggle-item {
+  flex-direction: row !important;
+  gap: 6px !important;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #333;
+  border-radius: 20px;
+  transition: 0.3s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: #888;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #00ff41;
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+  background: #0a0a0a;
+}
+
+.toggle-label {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ====== AI 状态 ====== */
+#ai-status {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  color: #888;
+  padding: 4px 8px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+/* ====== Canvas ====== */
+#game-canvas {
+  display: block;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  background: #0a0a0a;
+}
+
+/* ====== 图例 ====== */
+.legend {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.legend-item {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+/* ====== 覆盖层 ====== */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 0.3s ease;
+}
+
+.overlay.hidden {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay-content {
+  text-align: center;
+  padding: 24px 32px;
+}
+
+.game-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 48px;
+  font-weight: 900;
+  color: #00ff41;
+  text-shadow: 0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3);
+  letter-spacing: 8px;
+  margin-bottom: 16px;
+}
+
+.overlay-content h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 32px;
+  color: #ff0044;
+  text-shadow: 0 0 20px rgba(255, 0, 68, 0.5);
+  margin-bottom: 12px;
+}
+
+.start-hint, .restart-hint {
+  font-size: 16px;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
+.start-subtitle {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #222;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  color: #00ff41;
+}
+
+/* ====== 道具卡片 ====== */
+.overlay-items {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.item-icon {
+  font-size: 20px;
+}
+
+.item-desc {
+  font-size: 10px;
+  color: #888;
+  font-family: 'Orbitron', monospace;
+}
+
+/* ====== Game Over 面板 ====== */
+.gameover-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.final-score {
+  font-family: 'Orbitron', monospace;
+  font-size: 28px;
+  color: #fff;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+.new-record {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  color: #ffd700;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  animation: recordPulse 1s ease-in-out infinite;
+}
+
+@keyframes recordPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ====== 分数提交区域 ====== */
+.score-submit-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.submit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.name-input {
+  padding: 6px 12px;
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #00ff41;
+  outline: none;
+  width: 140px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.name-input:focus {
+  border-color: #00ff41;
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+}
+
+.name-input::placeholder {
+  color: #555;
+  font-size: 10px;
+  text-transform: none;
+}
+
+.neon-btn {
+  padding: 6px 16px;
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  background: transparent;
+  border: 1px solid #00ff41;
+  border-radius: 4px;
+  color: #00ff41;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.neon-btn:hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.3);
+}
+
+.neon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.submit-hint {
+  font-size: 10px;
+  color: #555;
+}
+
+.submit-success {
+  font-size: 14px;
+  color: #00ff41;
+  font-family: 'Orbitron', monospace;
+  margin: 8px 0;
+}
+
+/* ====== 排行榜面板 ====== */
+.leaderboard-panel {
+  width: 200px;
+  min-height: 300px;
+  background: rgba(10, 10, 10, 0.9);
+  border: 1px solid #1a1a1a;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.leaderboard-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  color: #00ff41;
+  letter-spacing: 1px;
+}
+
+.refresh-btn {
+  font-size: 16px !important;
+  padding: 2px 8px !important;
+  border-color: #333 !important;
+  color: #888 !important;
+}
+
+.refresh-btn:hover {
+  border-color: #00ff41 !important;
+  color: #00ff41 !important;
+}
+
+.leaderboard-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.leaderboard-loading,
+.leaderboard-empty,
+.leaderboard-error {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+  padding: 20px 0;
+  font-family: 'Orbitron', monospace;
+}
+
+.leaderboard-error {
+  color: #ff0044;
+}
+
+.lb-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.2s;
+}
+
+.lb-entry:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lb-entry.top-1 {
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.lb-entry.top-2 {
+  background: rgba(192, 192, 192, 0.06);
+}
+
+.lb-entry.top-3 {
+  background: rgba(205, 127, 50, 0.06);
+}
+
+.lb-rank {
+  width: 24px;
+  text-align: center;
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  color: #888;
+}
+
+.lb-name {
+  flex: 1;
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  color: #ccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-score {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  color: #00ff41;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ====== 响应式 ====== */
+@media (max-width: 768px) {
+  #play-area {
+    flex-direction: column;
+    align-items: center;
+  }
+  .leaderboard-panel {
+    width: 100%;
+    max-width: 560px;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  #game-wrapper {
+    padding: 4px;
+    gap: 4px;
+  }
+  .game-title {
+    font-size: 32px;
+    letter-spacing: 4px;
+  }
+  .overlay-content h2 {
+    font-size: 24px;
+  }
+  .final-score {
+    font-size: 20px;
+  }
+  .leaderboard-panel {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  #score-panel {
+    gap: 6px;
+  }
+  .score-value {
+    font-size: 14px;
+  }
+}
