@@ -96,6 +96,27 @@ body {
     min-width: 48px;
 }
 
+/* AI 模式指示器（👤 MAN / 🤖 AI） */
+.score-value.ai-mode {
+    color: #888;
+    text-shadow: none;
+    font-size: 16px;
+    min-width: 64px;
+    transition: all 0.3s ease;
+}
+
+/* AI 自动驾驶激活状态 */
+.score-value.ai-mode.ai-active {
+    color: #00ff41;
+    text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
+    animation: aiPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1;   }
+}
+
 .score-divider {
     width: 1px;
     height: 36px;

@@ -270,6 +270,7 @@ class InputHandler {
      *   .onDirection(dir)  — (不再使用，改用队列消费)
      *   .onStart()         — 空格/点击开始
      *   .onTogglePause()   — P/Esc 暂停切换
+     *   .onToggleAI()      — F 键 AI 自动驾驶切换
      */
     constructor(callbacks) {
         this.callbacks = callbacks;
@@ -336,6 +337,13 @@ class InputHandler {
         if (key === 'p' || key === 'P' || key === 'Escape') {
             e.preventDefault();
             if (this.callbacks.onTogglePause) this.callbacks.onTogglePause();
+            return;
+        }
+
+        // ---- F：AI 自动驾驶切换 ----
+        if (key === 'f' || key === 'F') {
+            e.preventDefault();
+            if (this.callbacks.onToggleAI) this.callbacks.onToggleAI();
             return;
         }
     }
@@ -769,6 +777,7 @@ class Game {
         this.gameoverOverlay= document.getElementById('gameover-overlay');
         this.newRecordBadge = document.getElementById('new-record-badge');
         this.wrapToggle     = document.getElementById('wrap-toggle');
+        this.aiStatusEl     = document.getElementById('ai-status');
 
         // ---- 游戏核心数据 ----
         this.score       = 0;
@@ -799,7 +808,9 @@ class Game {
             // onDirection 不再使用，改用队列 consumeDirection
             onStart:       () => this._handleStart(),
             onTogglePause: () => this._handleTogglePause(),
+            onToggleAI:    () => this._handleToggleAI(),
         });
+        this.ai = new AIPlayer(this);
 
         // ---- 粒子系统 ----
         this.particles = [];
@@ -841,9 +852,10 @@ class Game {
         // 阻止触控时的 click 事件冒泡
         this.canvas.addEventListener('touchstart', (e) => e.preventDefault());
 
-        // ---- 显示最高分 ----
+        // ---- 显示最高分 & AI 状态 ----
         this._updateScoreDisplay();
         this._updateSpeedDisplay();
+        this._updateAIStatus();     // 初始显示 👤 MAN
 
         // ---- 启动渲染循环 ----
         this._loop(0);
@@ -892,10 +904,26 @@ class Game {
     //  _update() — 每 tick 游戏逻辑更新
     // ========================================================================
     _update() {
-        // ---- 1. 消费输入指令队列（每 tick 只消费一个） ----
-        const dir = this.inputHandler.consumeDirection();
-        if (dir) {
-            this.snake.setDirection(dir);
+        // ---- 1. AI 或玩家控制方向 ----
+        if (this.ai.enabled) {
+            // AI 自动寻路：每 tick 由 AIPlayer 决策最佳方向
+            const aiDir = this.ai.decide();
+            if (aiDir) {
+                // 如果蛇处于反转状态 (紫色毒药效果)，
+                // setDirection 内部会将方向取反，导致 AI 的实际移动方向与预期相反。
+                // 因此这里预先将 AI 方向取反，与 setDirection 的反转抵消，
+                // 使 AI 最终能朝正确方向移动。
+                const adjusted = this.snake.reversed
+                    ? { dx: -aiDir.dx, dy: -aiDir.dy }
+                    : aiDir;
+                this.snake.setDirection(adjusted);
+            }
+            // AI 模式下清空玩家输入队列，防止积压
+            this.inputHandler.clearQueue();
+        } else {
+            // 玩家手动控制：从输入队列消费一个方向
+            const dir = this.inputHandler.consumeDirection();
+            if (dir) this.snake.setDirection(dir);
         }
 
         // ---- 2. 蛇移动 ----
@@ -1190,6 +1218,19 @@ class Game {
 
         // ---- 效果指示器（在 Canvas 角落显示当前效果） ----
         this._renderEffectIndicators(ctx);
+
+        // ---- AI 状态指示器（左上角显示 AI 自动驾驶状态） ----
+        if (this.ai.enabled) {
+            ctx.save();
+            ctx.font = 'bold 11px Orbitron, monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ff41';
+            ctx.fillStyle = '#00ff41';
+            ctx.fillText('🤖 AI', 8, 8);
+            ctx.restore();
+        }
     }
 
     /**
@@ -1285,6 +1326,9 @@ class Game {
         // 清空输入队列
         this.inputHandler.clearQueue();
 
+        // 重置 AI 状态（在 AI 开启状态下重启时保留 AI 模式）
+        this.ai.reset();
+
         // 更新 UI
         this._updateScoreDisplay();
         this._updateSpeedDisplay();
@@ -1297,8 +1341,11 @@ class Game {
         this.pauseOverlay.classList.add('hidden');
 
         // 重置计时器
+        // 注意：必须同时重置 lastTickTime，防止重置后 _loop 用旧的 deltaTime
+        // 立即触发 _update()，导致蛇在未准备好的情况下碰撞检测失败
         this.lastTickTime = 0;
         this.accumulator = 0;
+        this.animFrameId  = null; // 清除旧的 rAF ID 防止重复回调
     }
 
     _gameOver() {
@@ -1341,6 +1388,32 @@ class Game {
     _loadHighScore() {
         this.highScore = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
         this._updateScoreDisplay();
+    }
+
+    // ========================================================================
+    //  AI 自动驾驶切换
+    // ========================================================================
+
+    /**
+     * 切换 AI 自动驾驶的开启/关闭
+     * 按 F 键触发，状态变化会同步到 UI 指示器
+     */
+    _handleToggleAI() {
+        this.ai.enabled = !this.ai.enabled;
+        this._updateAIStatus();
+
+        if (this.ai.enabled) {
+            // 开启 AI 时清空玩家输入队列，避免残留指令干扰
+            this.inputHandler.clearQueue();
+        }
+    }
+
+    /** 更新 AI 状态 DOM 指示器 */
+    _updateAIStatus() {
+        if (this.aiStatusEl) {
+            this.aiStatusEl.textContent = this.ai.enabled ? '🤖 AI' : '👤 MAN';
+            this.aiStatusEl.classList.toggle('ai-active', this.ai.enabled);
+        }
     }
 }
 

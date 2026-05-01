@@ -31,6 +31,12 @@
                 <span id="speed-level" class="score-value speed">Lv.0</span>
             </div>
             <div class="score-divider"></div>
+            <!-- AI 自动驾驶状态指示器 -->
+            <div class="score-item">
+                <span class="score-label">MODE</span>
+                <span id="ai-status" class="score-value ai-mode">👤 MAN</span>
+            </div>
+            <div class="score-divider"></div>
             <!-- 穿墙模式切换开关 -->
             <div class="score-item toggle-item">
                 <span class="score-label">WRAP</span>
@@ -99,6 +105,7 @@
         <p id="touch-hint" class="touch-hint">← Swipe to control →</p>
     </div>
 
+    <script src="ai.js"></script>
     <script src="game.js"></script>
     <script>
         // ---- PWA Service Worker 注册 ----
