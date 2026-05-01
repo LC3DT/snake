@@ -1,0 +1,62 @@
+# ============================================================================
+#  🐍 Snake Game — Docker Compose
+#  一键启动全栈贪吃蛇游戏套件
+#
+#  使用方式：
+#    docker compose up -d            # 后台启动
+#    docker compose logs -f          # 查看日志
+#    docker compose down -v          # 停止并删除卷
+#    docker compose restart backend  # 重启后端
+# ============================================================================
+name: snake-game
+
+services:
+  # ---- 后端服务 ----
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: snake-backend
+    restart: unless-stopped
+    ports:
+      # 后端端口仅在需要直接调试时暴露；生产环境建议移除外部映射
+      - "3001:3001"
+    environment:
+      # 数据库文件写入 /data 目录（由 volume 持久化）
+      - DB_DIR=/data
+      - PORT=3001
+      - NODE_ENV=production
+    volumes:
+      # 命名卷：重启/升级后排行榜数据不丢失
+      - snake-db-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # ---- 前端服务 ----
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: snake-frontend
+    restart: unless-stopped
+    ports:
+      # 宿主机 8080 端口 → 容器内 Nginx 80 端口
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+# ---- 数据卷声明 ----
+volumes:
+  snake-db-data:
+    driver: local

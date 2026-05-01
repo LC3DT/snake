@@ -18,7 +18,9 @@ const initSqlJs = require('sql.js');
 // ---- App setup ----
 const app     = express();
 const PORT    = process.env.PORT || 3001;
-const DB_PATH = path.join(__dirname, 'leaderboard.db');
+// DB_DIR 环境变量用于指定数据库文件存储目录（Docker/K8s 挂载卷用）
+const DB_DIR  = process.env.DB_DIR || __dirname;
+const DB_PATH = path.join(DB_DIR, 'leaderboard.db');
 
 // ---- Middleware ----
 app.use(cors());                  // Allow all origins (for dev)

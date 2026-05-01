@@ -26,8 +26,14 @@ const MIN_TICK_INTERVAL   = 60;        // 最快 tick 间隔下限
 const FOODS_PER_SPEEDUP   = 5;         // 每吃几个食物加速一次
 const SPEEDUP_AMOUNT      = 8;         // 每次加速减少的 ms 数
 
-// 排行榜 API 地址
-const API_BASE_URL = 'http://localhost:3001/api';
+/**
+ * 排行榜 API 基础地址
+ * - 当通过 Nginx 反向代理访问（HTTP 协议）时，使用相对路径 /api
+ * - 当直接打开 index.html（file:// 协议）时，fallback 到 localhost:3001
+ */
+const API_BASE_URL = window.location.protocol.startsWith('http')
+    ? '/api'
+    : 'http://localhost:3001/api';
 
 // 方向向量 —— {dx, dy} 表示单位移动方向
 const DIR = {

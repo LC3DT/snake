@@ -2,7 +2,7 @@
 
 > **前端**：HTML5 Canvas + CSS3 (Dark Neon主题) + Vanilla JS (ES6+)
 >
-> **后端**：Node.js + Express + SQLite (better-sqlite3)
+> **后端**：Node.js + Express + SQLite (sql.js — 纯 JS，无需原生编译)
 >
 > **零前端依赖** — 无需任何外部库或框架，纯浏览器原生 API 实现
 
@@ -122,10 +122,10 @@ Layer 4: 洪泛逃生 → 选最大连通方向
 ┌─────────────────────────────────┐
 │         全栈架构                  │
 │                                 │
-│  前端 (浏览器)                   │
-│    ↓ fetch()                    │
+│  前端 (浏览器 / Nginx)           │
+│    ↓ fetch() / 反向代理          │
 │  Node.js + Express              │
-│    ↓ better-sqlite3             │
+│    ↓ sql.js (纯 JS SQLite)      │
 │  SQLite (leaderboard.db)        │
 └─────────────────────────────────┘
 ```
@@ -135,6 +135,10 @@ Layer 4: 洪泛逃生 → 选最大连通方向
 - 排行榜自动刷新 — 提交分数后即时更新
 - 首三位分别用 🥇🥈🥉 标记
 - Dark Neon 风格，与游戏主题统一
+
+### 🐳 容器化 & 集群部署 (v5.0)
+
+支持 Docker Compose 一键部署和 K3s/Kubernetes 集群部署，详见下文「部署方式 — 方式四 / 方式五」。
 
 ---
 
@@ -196,7 +200,129 @@ npx http-server ./ -p 8080 -c-1
 | 前端 (静态文件) | Netlify / Vercel / GitHub Pages | 部署 `index.html` + 资源 |
 | 后端 (API) | Render / Railway / Fly.io | 部署 `server/` 目录 |
 
-> 生产部署时，修改 [`game.js`](game.js:28) 中的 `API_BASE_URL` 为实际后端地址。
+> 生产部署时，若前后端不同源，需配置 CORS 或在 Nginx 侧添加反向代理规则。
+> [`game.js`](game.js:30) 的 `API_BASE_URL` 已自动适配：通过 HTTP 访问时使用相对路径 `/api`（反向代理模式），直接打开时使用 `localhost:3001`。
+
+### 方式四：Docker Compose（本地容器化）
+
+需要 **Docker Engine 24+** 和 **Docker Compose v2**（通常已内置）。
+
+```bash
+# 1. 克隆项目
+git clone <repo-url> && cd snake
+
+# 2. 一键构建并启动
+docker compose up -d
+
+# 3. 访问 http://localhost:8080
+#    后端 API 通过 Nginx 反向代理自动转发，零跨域配置
+```
+
+**架构说明：**
+
+```
+宿主机 :8080         宿主机 :3001 (可选)
+    │                     │
+    ▼                     ▼
+┌─────────────┐    ┌──────────────┐
+│  Frontend   │    │   Backend    │
+│  nginx:alpine │    │  node:alpine │
+│  ─────────  │    │  ──────────  │
+│  /api/ → ───┼───►│  :3001       │
+│  静态文件    │    │  SQLite      │
+└─────────────┘    └──────┬───────┘
+                          │ /data/leaderboard.db
+                          ▼
+                   ┌──────────────┐
+                   │  named volume │
+                   │ snake-db-data│
+                   └──────────────┘
+```
+
+- 前端 Nginx 容器托管静态文件 + 反向代理 `/api/` → `backend:3001`
+- 后端使用命名卷 [`snake-db-data`](docker-compose.yml:60) 持久化 SQLite 数据库
+- 后端依赖 `service_healthy` 条件启动，确保数据库就绪后前端才接受请求
+- 直接访问 `http://localhost:8080`，同源通信，无需 CORS
+
+**常用命令：**
+```bash
+docker compose logs -f              # 查看实时日志
+docker compose down -v              # 停止并删除卷（⚠ 会丢失排行榜数据）
+docker compose restart backend      # 仅重启后端
+docker compose build --no-cache     # 强制重建镜像
+```
+
+### 方式五：K3s / Kubernetes（生产集群）
+
+需要 **K3s 1.19+** 或 **Kubernetes 1.19+** 集群。
+
+```bash
+# 1. 构建镜像并推送到节点可访问的仓库（或使用 K3s 内置 containerd）
+docker build -t snake-backend:latest ./server
+docker build -t snake-frontend:latest .
+
+# 2. 如果是 K3s 单节点，可直接导入镜像
+k3s ctr images import snake-backend:latest
+k3s ctr images import snake-frontend:latest
+
+# 3. 部署
+kubectl apply -f k8s-manifest.yaml
+
+# 4. 查看服务状态
+kubectl get pods
+kubectl get svc snake-frontend
+
+# 5. 访问 http://<node-ip>:30080
+```
+
+**K8s 架构说明：**
+
+```
+用户 → http://<node-ip>:30080
+         │
+         ▼
+┌──────────────────────────────┐
+│  Service: snake-frontend     │  ← NodePort :30080
+│  selector: app=snake/frontend│
+└──────────┬───────────────────┘
+           │  (kube-proxy 轮询)
+     ┌─────┴─────┐
+     ▼           ▼
+┌─────────┐ ┌─────────┐
+│ Frontend│ │ Frontend│  ← Deployment, replicas: 2
+│ Pod #1  │ │ Pod #2  │
+│ Nginx   │ │ Nginx   │
+└────┬────┘ └────┬────┘
+     │ /api/ 请求 │
+     └─────┬─────┘
+           ▼
+┌──────────────────────────────┐
+│  Service: backend (ClusterIP)│  ← 名称 "backend" 与 nginx.conf 一致
+│  selector: app=snake/backend │
+└──────────┬───────────────────┘
+           │
+           ▼
+┌──────────────────────────────┐
+│  Pod: snake-backend (×1)    │  ← SQLite 限制单副本
+│  /data/leaderboard.db       │
+│  ─────────────────────────  │
+│  PVC: snake-db-pvc           │  ← 1Gi 持久化存储
+└──────────────────────────────┘
+```
+
+**Nginx 反向代理在 K8s 中的路由逻辑：**
+1. 浏览器请求 `http://<node-ip>:30080/api/leaderboard`
+2. Nginx 匹配 `location /api/` → `proxy_pass http://backend:3001`
+3. CoreDNS 将 `backend` 解析为后端 ClusterIP Service 的虚拟 IP
+4. kube-proxy 将请求转发到 snake-backend Pod 的 3001 端口
+5. 整个过程浏览器始终与同一个 origin 通信，无需配置 CORS
+
+**PVC 挂载逻辑（数据持久化）：**
+1. [`snake-db-pvc`](k8s-manifest.yaml:36) 声明 1Gi 存储 → K3s `local-path` 自动创建 PV
+2. Deployment 通过 `volumes[].persistentVolumeClaim` 引用 PVC
+3. 宿主机目录被挂载到 Pod 的 `/data` 路径
+4. 后端通过 `DB_DIR=/data` 环境变量将数据库写入 `/data/leaderboard.db`
+5. 容器重启、升级、调度到其他节点时，数据通过 PVC 持久保留
 
 ---
 
@@ -204,26 +330,31 @@ npx http-server ./ -p 8080 -c-1
 
 ```
 snake/
-├── index.html           # 入口 HTML — 游戏界面 + 排行榜面板
-├── style.css            # Dark Neon 主题样式 + 响应式适配
-├── game.js              # 核心游戏逻辑 (≈1500 行)
-│   ├─ Constants         # 网格/速度/状态常量
-│   ├─ AudioManager      # Web Audio API 8-bit 音效
-│   ├─ Particle          # 粒子特效
-│   ├─ InputHandler      # 键盘/触控 + 指令队列
-│   ├─ Snake             # 蛇管理（穿墙/反转）
-│   ├─ Item              # 道具系统（4 种类型）
-│   └─ Game              # 主控制器（状态机/循环/特效/排行榜 API）
-├── ai.js                # AI 自动驾驶 (390 行)
-│   └─ AIPlayer          # A* 寻路 + 虚拟预演 + 追尾 + 洪泛
-├── manifest.json        # PWA 清单
-├── sw.js                # Service Worker 缓存策略
-├── README.md            # 本文档
-├── server/              # 后端服务
-│   ├─ package.json      # 依赖声明
-│   ├─ server.js         # Express 服务 + SQLite API
-│   └─ leaderboard.db    # SQLite 数据库（运行时自动创建）
-└── plans/               # 设计文档
+├── index.html              # 入口 HTML — 游戏界面 + 排行榜面板
+├── style.css               # Dark Neon 主题样式 + 响应式适配
+├── game.js                 # 核心游戏逻辑 (≈1650 行)
+│   ├─ Constants            # 网格/速度/状态常量
+│   ├─ AudioManager         # Web Audio API 8-bit 音效
+│   ├─ Particle             # 粒子特效
+│   ├─ InputHandler         # 键盘/触控 + 指令队列
+│   ├─ Snake                # 蛇管理（穿墙/反转）
+│   ├─ Item                 # 道具系统（4 种类型）
+│   └─ Game                 # 主控制器（状态机/循环/特效/排行榜 API）
+├── ai.js                   # AI 自动驾驶 (≈400 行)
+│   └─ AIPlayer             # A* 寻路 + 虚拟预演 + 追尾 + 洪泛
+├── manifest.json           # PWA 清单
+├── sw.js                   # Service Worker 缓存策略
+├── nginx.conf              # Nginx 配置（反向代理 /api/ → 后端）
+├── Dockerfile              # 前端容器构建文件 (nginx:alpine)
+├── docker-compose.yml      # Docker Compose 编排（一键全栈启动）
+├── k8s-manifest.yaml       # Kubernetes / K3s 部署清单
+├── README.md               # 本文档
+├── server/                 # 后端服务
+│   ├── Dockerfile          # 后端容器构建文件 (node:alpine)
+│   ├── package.json        # 依赖声明 (express + cors + sql.js)
+│   ├── server.js           # Express 服务 + SQLite API
+│   └── leaderboard.db      # SQLite 数据库（运行时自动创建）
+└── plans/                  # 设计文档
     ├─ architecture-plan.md
     ├─ enhancement-plan.md
     └─ ai-autopilot-plan.md

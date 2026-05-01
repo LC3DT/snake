@@ -1,0 +1,238 @@
+# ============================================================================
+#  🐍 Snake Game — Kubernetes / K3s 部署清单
+#
+#  适用环境：K3s / K8s 1.19+
+#  部署命令：
+#    kubectl apply -f k8s-manifest.yaml
+#  访问方式：
+#    kubectl get svc snake-frontend  # 查看 NodePort 端口
+#    http://<node-ip>:<NodePort>
+# ============================================================================
+
+---
+# ---- 命名空间（可选，默认部署到 default） ----
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   name: snake-game
+
+---
+# ============================================================================
+#  后端 — PersistentVolumeClaim
+#
+#  存储后端 SQLite 数据库文件（leaderboard.db），保证容器重启后数据不丢失。
+#
+#  挂载逻辑：
+#    PVC 声明 1Gi 存储 → K3s 默认 StorageClass (local-path) 自动创建 PV
+#    → 宿主机上的目录被挂载到 Pod 的 /data 路径
+#    → server.js 通过 DB_DIR=/data 将数据库文件写入 /data/leaderboard.db
+#    → 容器重启后，PVC 仍然存在，数据得以保留
+# ============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snake-db-pvc
+  # namespace: snake-game
+  labels:
+    app: snake
+    component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce       # 单节点读写（SQLite 不支持并发写入）
+  resources:
+    requests:
+      storage: 1Gi         # 排行榜数据量极小，1Gi 绰绰有余
+
+---
+# ============================================================================
+#  后端 — Deployment
+#
+#  仅 1 个副本：SQLite 是单文件数据库，并发写入会导致锁竞争/数据损坏。
+#  如需高可用，应升级到 PostgreSQL 等支持并发的数据库。
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snake-backend
+  # namespace: snake-game
+  labels:
+    app: snake
+    component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snake
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: snake
+        component: backend
+    spec:
+      containers:
+        - name: backend
+          # 使用 docker-compose build 构建的镜像
+          # 生产环境建议推送到私有镜像仓库
+          image: snake-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+              protocol: TCP
+          env:
+            - name: DB_DIR
+              value: "/data"           # 数据库文件写入挂载卷
+            - name: PORT
+              value: "3001"
+            - name: NODE_ENV
+              value: "production"
+          # ---- 挂载 PVC 到 /data ----
+          volumeMounts:
+            - name: db-storage
+              mountPath: /data
+          # ---- 就绪探针 ----
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # ---- 存活探针 ----
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: snake-db-pvc
+
+---
+# ============================================================================
+#  后端 — Service (ClusterIP)
+#
+#  类型：ClusterIP — 仅集群内部可达。
+#  Service 名称 "backend" 必须与 nginx.conf 中 proxy_pass 的 hostname 一致。
+#
+#  路由逻辑：
+#    Nginx (snake-frontend Pod) 发起请求到 http://backend:3001/api/leaderboard
+#    → CoreDNS 解析 "backend" → 此 Service 的 ClusterIP
+#    → kube-proxy 转发到 snake-backend Pod 的 3001 端口
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend                # ⚠ 必须与 nginx.conf 的 proxy_pass hostname 一致
+  # namespace: snake-game
+  labels:
+    app: snake
+    component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: snake
+    component: backend
+  ports:
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+      name: http
+
+---
+# ============================================================================
+#  前端 — Deployment
+#
+#  2 个副本实现高可用。多副本间的状态差异只有排行榜数据——因前后端分离，
+#  每个前端副本都查询同一个后端 Service，数据始终保持一致。
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snake-frontend
+  # namespace: snake-game
+  labels:
+    app: snake
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: snake
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: snake
+        component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: snake-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          # ---- 就绪探针 ----
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # ---- 存活探针 ----
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+
+---
+# ============================================================================
+#  前端 — Service (NodePort)
+#
+#  类型：NodePort — 从集群外部访问。
+#  在每个 K3s 节点的指定端口（或随机端口）暴露前端 Nginx 服务。
+#
+#  前端 Nginx 内部反向代理逻辑（详见 nginx.conf）：
+#    1. 浏览器请求 http://<node-ip>:30080/              → Nginx 返回 index.html
+#    2. 浏览器请求 http://<node-ip>:30080/api/leaderboard → Nginx 代理到
+#       http://backend:3001/api/leaderboard
+#       （CoreDNS 将 "backend" 解析为后端 ClusterIP Service）
+#    3. 整个过程浏览器始终与同一 origin 通信，无需 CORS 配置
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: snake-frontend
+  # namespace: snake-game
+  labels:
+    app: snake
+    component: frontend
+spec:
+  type: NodePort
+  selector:
+    app: snake
+    component: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080          # 固定 NodePort 端口（有效范围 30000-32767）
+      protocol: TCP
+      name: http
