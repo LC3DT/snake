@@ -2,13 +2,19 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>🐍 贪吃蛇 Snake</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
     <div id="game-wrapper">
-        <!-- 顶部面板：分数显示 -->
+        <!-- ================================================================
+             顶部面板：分数 + 速度等级 + 模式切换
+             ================================================================ -->
         <div id="score-panel">
             <div class="score-item">
                 <span class="score-label">SCORE</span>
@@ -19,25 +25,55 @@
                 <span class="score-label">HIGH</span>
                 <span id="high-score" class="score-value high">000</span>
             </div>
+            <div class="score-divider"></div>
+            <div class="score-item">
+                <span class="score-label">SPEED</span>
+                <span id="speed-level" class="score-value speed">Lv.0</span>
+            </div>
+            <div class="score-divider"></div>
+            <!-- 穿墙模式切换开关 -->
+            <div class="score-item toggle-item">
+                <span class="score-label">WRAP</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="wrap-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
         </div>
 
-        <!-- Canvas 游戏区域 -->
+        <!-- ================================================================
+             Canvas 游戏区域
+             ================================================================ -->
         <div id="canvas-container">
             <canvas id="game-canvas" width="400" height="400"></canvas>
 
-            <!-- 开始界面覆盖层 -->
+            <!-- 道具图例（悬浮提示） -->
+            <div id="item-legend" class="legend">
+                <span class="legend-dot" style="background:#ff0044;"></span> +10
+                <span class="legend-dot" style="background:#ffd700;"></span> +50⭐
+                <span class="legend-dot" style="background:#00bfff;"></span> 🐢
+                <span class="legend-dot" style="background:#bf00ff;"></span> 🌀
+            </div>
+
+            <!-- 开始界面 -->
             <div id="start-overlay" class="overlay">
                 <div class="overlay-content">
                     <div class="snake-icon">🐍</div>
                     <h1>贪吃蛇</h1>
-                    <p class="overlay-hint">Press <kbd>SPACE</kbd> or Click to Start</p>
+                    <p class="overlay-hint">Press <kbd>SPACE</kbd> or Tap to Start</p>
                     <p class="overlay-controls">
-                        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Arrow Keys to move
+                        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Swipe to move
                     </p>
+                    <div class="overlay-items">
+                        <span>🍎+10</span>
+                        <span>⭐+50</span>
+                        <span>💧Slow</span>
+                        <span>☠️Reverse</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- 暂停覆盖层 -->
+            <!-- 暂停 -->
             <div id="pause-overlay" class="overlay hidden">
                 <div class="overlay-content">
                     <h1>⏸ PAUSED</h1>
@@ -45,7 +81,7 @@
                 </div>
             </div>
 
-            <!-- 游戏结束覆盖层 -->
+            <!-- 游戏结束 -->
             <div id="gameover-overlay" class="overlay hidden">
                 <div class="overlay-content gameover-panel">
                     <h1>💀 GAME OVER</h1>
@@ -54,12 +90,25 @@
                         <p id="final-score-value" class="final-value">0</p>
                     </div>
                     <div class="new-record hidden" id="new-record-badge">🏆 NEW RECORD!</div>
-                    <p class="overlay-hint">Press <kbd>SPACE</kbd> to Restart</p>
+                    <p class="overlay-hint">Press <kbd>SPACE</kbd> or Tap to Restart</p>
                 </div>
             </div>
         </div>
+
+        <!-- 触控操作提示（仅移动端可见） -->
+        <p id="touch-hint" class="touch-hint">← Swipe to control →</p>
     </div>
 
     <script src="game.js"></script>
+    <script>
+        // ---- PWA Service Worker 注册 ----
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {
+                    // 静默失败（不支持 SW 的环境不影响游戏）
+                });
+            });
+        }
+    </script>
 </body>
 </html>
