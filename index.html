@@ -48,55 +48,85 @@
         </div>
 
         <!-- ================================================================
-             Canvas 游戏区域
+             主游戏区域：Canvas + 覆盖层 + 排行榜
              ================================================================ -->
-        <div id="canvas-container">
-            <canvas id="game-canvas" width="400" height="400"></canvas>
+        <div id="play-area">
+            <div id="canvas-container">
+                <canvas id="game-canvas" width="400" height="400"></canvas>
 
-            <!-- 道具图例（悬浮提示） -->
-            <div id="item-legend" class="legend">
-                <span class="legend-dot" style="background:#ff0044;"></span> +10
-                <span class="legend-dot" style="background:#ffd700;"></span> +50⭐
-                <span class="legend-dot" style="background:#00bfff;"></span> 🐢
-                <span class="legend-dot" style="background:#bf00ff;"></span> 🌀
-            </div>
+                <!-- 道具图例（悬浮提示） -->
+                <div id="item-legend" class="legend">
+                    <span class="legend-dot" style="background:#ff0044;"></span> +10
+                    <span class="legend-dot" style="background:#ffd700;"></span> +50⭐
+                    <span class="legend-dot" style="background:#00bfff;"></span> 🐢
+                    <span class="legend-dot" style="background:#bf00ff;"></span> 🌀
+                </div>
 
-            <!-- 开始界面 -->
-            <div id="start-overlay" class="overlay">
-                <div class="overlay-content">
-                    <div class="snake-icon">🐍</div>
-                    <h1>贪吃蛇</h1>
-                    <p class="overlay-hint">Press <kbd>SPACE</kbd> or Tap to Start</p>
-                    <p class="overlay-controls">
-                        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Swipe to move
-                    </p>
-                    <div class="overlay-items">
-                        <span>🍎+10</span>
-                        <span>⭐+50</span>
-                        <span>💧Slow</span>
-                        <span>☠️Reverse</span>
+                <!-- 开始界面 -->
+                <div id="start-overlay" class="overlay">
+                    <div class="overlay-content">
+                        <div class="snake-icon">🐍</div>
+                        <h1>贪吃蛇</h1>
+                        <p class="overlay-hint">Press <kbd>SPACE</kbd> or Tap to Start</p>
+                        <p class="overlay-controls">
+                            <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Swipe to move
+                        </p>
+                        <div class="overlay-items">
+                            <span>🍎+10</span>
+                            <span>⭐+50</span>
+                            <span>💧Slow</span>
+                            <span>☠️Reverse</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 暂停 -->
+                <div id="pause-overlay" class="overlay hidden">
+                    <div class="overlay-content">
+                        <h1>⏸ PAUSED</h1>
+                        <p class="overlay-hint">Press <kbd>P</kbd> or <kbd>ESC</kbd> to Resume</p>
+                    </div>
+                </div>
+
+                <!-- 游戏结束 + 分数提交 -->
+                <div id="gameover-overlay" class="overlay hidden">
+                    <div class="overlay-content gameover-panel">
+                        <h1>💀 GAME OVER</h1>
+                        <div class="final-score">
+                            <p class="final-label">FINAL SCORE</p>
+                            <p id="final-score-value" class="final-value">0</p>
+                        </div>
+                        <div class="new-record hidden" id="new-record-badge">🏆 NEW RECORD!</div>
+
+                        <!-- 分数提交表单（score > 0 时显示） -->
+                        <div id="score-submit-area" class="score-submit-area hidden">
+                            <div class="submit-row">
+                                <input type="text" id="player-name-input"
+                                       class="name-input"
+                                       placeholder="Enter name"
+                                       maxlength="10"
+                                       autocomplete="off">
+                                <button id="submit-score-btn" class="neon-btn submit-btn">SUBMIT</button>
+                            </div>
+                            <p class="submit-hint">3-10 chars (letters, digits, underscore)</p>
+                        </div>
+
+                        <!-- 提交成功提示 -->
+                        <div id="submit-success" class="submit-success hidden">✅ Score submitted!</div>
+
+                        <p class="overlay-hint">Press <kbd>SPACE</kbd> or Tap to Restart</p>
                     </div>
                 </div>
             </div>
 
-            <!-- 暂停 -->
-            <div id="pause-overlay" class="overlay hidden">
-                <div class="overlay-content">
-                    <h1>⏸ PAUSED</h1>
-                    <p class="overlay-hint">Press <kbd>P</kbd> or <kbd>ESC</kbd> to Resume</p>
+            <!-- 排行榜面板 -->
+            <div id="leaderboard-panel" class="leaderboard-panel">
+                <div class="leaderboard-header">
+                    <span class="leaderboard-title">🏆 LEADERBOARD</span>
+                    <button id="refresh-leaderboard-btn" class="neon-btn refresh-btn" title="Refresh">⟳</button>
                 </div>
-            </div>
-
-            <!-- 游戏结束 -->
-            <div id="gameover-overlay" class="overlay hidden">
-                <div class="overlay-content gameover-panel">
-                    <h1>💀 GAME OVER</h1>
-                    <div class="final-score">
-                        <p class="final-label">FINAL SCORE</p>
-                        <p id="final-score-value" class="final-value">0</p>
-                    </div>
-                    <div class="new-record hidden" id="new-record-badge">🏆 NEW RECORD!</div>
-                    <p class="overlay-hint">Press <kbd>SPACE</kbd> or Tap to Restart</p>
+                <div id="leaderboard-body" class="leaderboard-body">
+                    <div class="leaderboard-loading">Loading...</div>
                 </div>
             </div>
         </div>

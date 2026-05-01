@@ -32,6 +32,16 @@ class AIPlayer {
         this._floodVisited = Array.from({ length: GRID_SIZE }, () => new Uint8Array(GRID_SIZE));
     }
 
+    /**
+     * 重置 AI 状态（游戏重启时调用）
+     * 当前 AI 是无状态决策（每帧重新计算），reset 作为空桩保留用于：
+     *   - 防止 _restartGame() 中 this.ai.reset() 调用抛错
+     *   - 未来若添加记忆化状态（如路径缓存），在此清理
+     */
+    reset() {
+        // 保留 AI 开关状态（enabled 不由 reset 控制）
+    }
+
     // ========================================================================
     //  主决策入口 — 每 tick 调用一次
     //  返回 {dx, dy} 方向向量

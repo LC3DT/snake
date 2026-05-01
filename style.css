@@ -388,6 +388,239 @@ kbd {
 }
 
 /* ==========================================================================
+   主游戏区域：Canvas + 排行榜水平布局
+   ========================================================================== */
+#play-area {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+/* ==========================================================================
+   分数提交表单 (Game Over 面板内)
+   ========================================================================== */
+.score-submit-area {
+    margin-top: 4px;
+    width: 100%;
+}
+
+.score-submit-area.hidden {
+    display: none;
+}
+
+.submit-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+
+.name-input {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: #e0e0e0;
+    outline: none;
+    width: 160px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.name-input:focus {
+    border-color: #00ff41;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.15);
+}
+
+.name-input::placeholder {
+    color: #555;
+}
+
+/* Neon 按钮 */
+.neon-btn {
+    background: transparent;
+    border: 1px solid #00ff41;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #00ff41;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.neon-btn:hover {
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 12px rgba(0, 255, 65, 0.3);
+}
+
+.neon-btn:active {
+    transform: scale(0.96);
+}
+
+.neon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.submit-hint {
+    font-size: 9px;
+    color: #555;
+    margin-top: 4px;
+    font-family: 'Orbitron', monospace;
+    letter-spacing: 0.5px;
+}
+
+.submit-success {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: #00ff41;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+    margin: 4px 0;
+}
+
+.submit-success.hidden {
+    display: none;
+}
+
+/* ==========================================================================
+   排行榜面板 (右侧)
+   ========================================================================== */
+.leaderboard-panel {
+    width: 220px;
+    background: rgba(17, 17, 17, 0.95);
+    border: 1px solid #1a1a1a;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow:
+        0 0 20px rgba(0, 255, 65, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.leaderboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #1a1a1a;
+    padding-bottom: 8px;
+}
+
+.leaderboard-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+    letter-spacing: 1px;
+}
+
+.refresh-btn {
+    padding: 4px 10px;
+    font-size: 14px;
+    border-radius: 6px;
+    border-color: #555;
+    color: #888;
+    line-height: 1;
+}
+
+.refresh-btn:hover {
+    border-color: #ffd700;
+    color: #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+}
+
+.leaderboard-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.leaderboard-loading,
+.leaderboard-empty,
+.leaderboard-error {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: #555;
+    text-align: center;
+    padding: 20px 0;
+    letter-spacing: 0.5px;
+}
+
+.leaderboard-error {
+    color: #ff0044;
+}
+
+/* 排行榜条目 */
+.lb-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: transparent;
+    transition: background 0.2s ease;
+}
+
+.lb-entry:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.lb-rank {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #555;
+    min-width: 24px;
+    text-align: center;
+}
+
+/* 前三名特殊颜色 */
+.lb-entry.top-1 .lb-rank {
+    color: #ffd700;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+.lb-entry.top-2 .lb-rank {
+    color: #c0c0c0;
+    text-shadow: 0 0 8px rgba(192, 192, 192, 0.3);
+}
+.lb-entry.top-3 .lb-rank {
+    color: #cd7f32;
+    text-shadow: 0 0 8px rgba(205, 127, 50, 0.3);
+}
+
+.lb-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: #aaa;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lb-score {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #00ff41;
+    text-shadow: 0 0 6px rgba(0, 255, 65, 0.3);
+    min-width: 36px;
+    text-align: right;
+}
+
+/* ==========================================================================
    触控提示 (仅移动端可见)
    ========================================================================== */
 .touch-hint {
@@ -407,6 +640,17 @@ kbd {
     #game-canvas {
         width: 320px;
         height: 320px;
+    }
+
+    /* 移动端排行榜放在下方 */
+    #play-area {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .leaderboard-panel {
+        width: 320px;
+        max-height: 200px;
     }
 
     .overlay-content h1 {
@@ -442,6 +686,11 @@ kbd {
 
     .gameover-panel {
         padding: 24px 32px;
+    }
+
+    .name-input {
+        width: 120px;
+        font-size: 11px;
     }
 
     .toggle-switch {

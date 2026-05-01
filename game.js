@@ -26,6 +26,9 @@ const MIN_TICK_INTERVAL   = 60;        // 最快 tick 间隔下限
 const FOODS_PER_SPEEDUP   = 5;         // 每吃几个食物加速一次
 const SPEEDUP_AMOUNT      = 8;         // 每次加速减少的 ms 数
 
+// 排行榜 API 地址
+const API_BASE_URL = 'http://localhost:3001/api';
+
 // 方向向量 —— {dx, dy} 表示单位移动方向
 const DIR = {
     UP:    { dx:  0, dy: -1 },
@@ -314,6 +317,13 @@ class InputHandler {
     // ========================================================================
     _handleKeyDown(e) {
         const key = e.key;
+
+        // 如果焦点在输入框/文本区中，不拦截任何按键（允许正常输入）
+        const activeTag = document.activeElement?.tagName?.toLowerCase();
+        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select' ||
+            document.activeElement?.isContentEditable) {
+            return;
+        }
 
         // ---- 方向键：压入队列 ----
         if (key in InputHandler.KEY_MAP) {
@@ -779,6 +789,14 @@ class Game {
         this.wrapToggle     = document.getElementById('wrap-toggle');
         this.aiStatusEl     = document.getElementById('ai-status');
 
+        // ---- 排行榜 & 分数提交 DOM ----
+        this.leaderboardBody = document.getElementById('leaderboard-body');
+        this.playerNameInput = document.getElementById('player-name-input');
+        this.submitScoreBtn  = document.getElementById('submit-score-btn');
+        this.submitArea      = document.getElementById('score-submit-area');
+        this.submitSuccess   = document.getElementById('submit-success');
+        this.refreshBtn      = document.getElementById('refresh-leaderboard-btn');
+
         // ---- 游戏核心数据 ----
         this.score       = 0;
         this.highScore   = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
@@ -847,15 +865,62 @@ class Game {
             });
         }
 
-        // ---- Canvas 点击事件 ----
+        // ---- Canvas 点击事件（仅在无覆盖层遮挡时有效） ----
         this.canvas.addEventListener('click', () => this._handleStart());
         // 阻止触控时的 click 事件冒泡
         this.canvas.addEventListener('touchstart', (e) => e.preventDefault());
+
+        // ---- 覆盖层点击事件（覆盖层在 canvas 上方，会拦截点击） ----
+        // 开始界面覆盖层：点击开始游戏
+        if (this.startOverlay) {
+            this.startOverlay.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleStart();
+            });
+        }
+        // 暂停覆盖层：点击恢复
+        if (this.pauseOverlay) {
+            this.pauseOverlay.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleTogglePause();
+            });
+        }
+        // 游戏结束覆盖层：点击重新开始
+        if (this.gameoverOverlay) {
+            this.gameoverOverlay.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleStart();
+            });
+        }
+
+        // ---- 排行榜刷新按钮 ----
+        if (this.refreshBtn) {
+            this.refreshBtn.addEventListener('click', () => this._fetchLeaderboard());
+        }
+
+        // ---- 分数提交 ----
+        if (this.submitScoreBtn) {
+            this.submitScoreBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._submitScore();
+            });
+        }
+        if (this.playerNameInput) {
+            this.playerNameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this._submitScore();
+                }
+            });
+        }
 
         // ---- 显示最高分 & AI 状态 ----
         this._updateScoreDisplay();
         this._updateSpeedDisplay();
         this._updateAIStatus();     // 初始显示 👤 MAN
+
+        // ---- 初始加载排行榜 ----
+        this._fetchLeaderboard();
 
         // ---- 启动渲染循环 ----
         this._loop(0);
@@ -1262,6 +1327,11 @@ class Game {
     // ========================================================================
 
     _handleStart() {
+        // 强制隐藏所有覆盖层（冗余防御：确保无论 state 如何，覆盖层都被隐藏）
+        if (this.startOverlay)    this.startOverlay.classList.add('hidden');
+        if (this.gameoverOverlay) this.gameoverOverlay.classList.add('hidden');
+        if (this.pauseOverlay)    this.pauseOverlay.classList.add('hidden');
+
         if (this.state === STATE.IDLE) {
             this._startGame();
         } else if (this.state === STATE.GAME_OVER) {
@@ -1292,10 +1362,20 @@ class Game {
     _resumeGame() {
         this.state = STATE.PLAYING;
         this.pauseOverlay.classList.add('hidden');
+
+        // 重置 lastTickTime，防止暂停期间累积的 deltaTime 导致 resume 后立即多次 _update()
+        this.lastTickTime = 0;
+        this.accumulator = 0;
     }
 
     /** 完全重置游戏状态 */
     _restartGame() {
+        // ---- 先取消所有待处理 rAF 回调，防止旧的 _loop 实例携带过期定时器触发 ----
+        if (this.animFrameId !== null) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
+
         // 重置蛇
         this.snake.reset(
             Math.floor(GRID_SIZE / 2),
@@ -1334,18 +1414,23 @@ class Game {
         this._updateSpeedDisplay();
         this._loadHighScore();
 
+        // 重置提交表单状态
+        if (this.submitArea)    this.submitArea.classList.add('hidden');
+        if (this.submitSuccess) this.submitSuccess.classList.add('hidden');
+
         // 切换到进行状态
         this.state = STATE.PLAYING;
         this.startOverlay.classList.add('hidden');
         this.gameoverOverlay.classList.add('hidden');
         this.pauseOverlay.classList.add('hidden');
 
-        // 重置计时器
-        // 注意：必须同时重置 lastTickTime，防止重置后 _loop 用旧的 deltaTime
-        // 立即触发 _update()，导致蛇在未准备好的情况下碰撞检测失败
+        // 重置计时器并重新启动循环
+        // 必须彻底重置 lastTickTime + accumulator，否则任何残留的 deltaTime
+        // 都会导致 accumulator 瞬间溢出 tickInterval，引发连续 _update() 碰撞。
+        // 同时要用 cancelAnimationFrame 清除旧的待处理回调，保证新 _loop 从零开始。
         this.lastTickTime = 0;
         this.accumulator = 0;
-        this.animFrameId  = null; // 清除旧的 rAF ID 防止重复回调
+        this.animFrameId = requestAnimationFrame((t) => this._loop(t));
     }
 
     _gameOver() {
@@ -1368,6 +1453,136 @@ class Game {
         }
 
         this.gameoverOverlay.classList.remove('hidden');
+
+        // ---- 分数 > 0 时显示提交表单 ----
+        this._resetSubmitUI();
+        if (this.score > 0 && this.submitArea) {
+            this.submitArea.classList.remove('hidden');
+            // 自动聚焦输入框
+            if (this.playerNameInput) {
+                setTimeout(() => this.playerNameInput.focus(), 100);
+            }
+        }
+    }
+
+    // ========================================================================
+    //  排行榜 API
+    // ========================================================================
+
+    /**
+     * 从后端获取 Top 10 排行榜数据并渲染
+     */
+    async _fetchLeaderboard() {
+        if (!this.leaderboardBody) return;
+        this.leaderboardBody.innerHTML = '<div class="leaderboard-loading">Loading...</div>';
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/leaderboard`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (!Array.isArray(data) || data.length === 0) {
+                this.leaderboardBody.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
+                return;
+            }
+
+            this.leaderboardBody.innerHTML = data.map(entry => {
+                const rankClass = entry.rank <= 3 ? ` top-${entry.rank}` : '';
+                const medal = entry.rank === 1 ? '🥇'
+                    : entry.rank === 2 ? '🥈'
+                    : entry.rank === 3 ? '🥉'
+                    : `#${entry.rank}`;
+                return `<div class="lb-entry${rankClass}">
+                    <span class="lb-rank">${medal}</span>
+                    <span class="lb-name">${this._escapeHtml(entry.playerName)}</span>
+                    <span class="lb-score">${String(entry.score).padStart(3, '0')}</span>
+                </div>`;
+            }).join('');
+        } catch (err) {
+            console.warn('Leaderboard fetch failed:', err);
+            this.leaderboardBody.innerHTML = '<div class="leaderboard-error">⚠ Server offline</div>';
+        }
+    }
+
+    /**
+     * 提交分数到后端
+     */
+    async _submitScore() {
+        if (!this.playerNameInput || !this.submitScoreBtn || !this.submitSuccess) return;
+
+        const name = this.playerNameInput.value.trim();
+
+        // ---- 验证 ----
+        if (!/^[a-zA-Z0-9_]{3,10}$/.test(name)) {
+            this.playerNameInput.style.borderColor = '#ff0044';
+            this.playerNameInput.style.boxShadow = '0 0 10px rgba(255, 0, 68, 0.3)';
+            return;
+        }
+        this.playerNameInput.style.borderColor = '#333';
+        this.playerNameInput.style.boxShadow = 'none';
+
+        // ---- 禁用按钮防重复提交 ----
+        this.submitScoreBtn.disabled = true;
+        this.submitScoreBtn.textContent = '...';
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/score`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playerName: name, score: this.score }),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${res.status}`);
+            }
+
+            // ---- 提交成功 ----
+            this.submitArea.classList.add('hidden');
+            this.submitSuccess.classList.remove('hidden');
+
+            // 排行榜自动刷新
+            this._fetchLeaderboard();
+        } catch (err) {
+            console.warn('Score submit failed:', err);
+            this.submitSuccess.textContent = '⚠ Submit failed, try again';
+            this.submitSuccess.style.color = '#ff0044';
+            this.submitSuccess.classList.remove('hidden');
+            setTimeout(() => {
+                this.submitSuccess.classList.add('hidden');
+                this.submitSuccess.textContent = '✅ Score submitted!';
+                this.submitSuccess.style.color = '#00ff41';
+            }, 3000);
+        } finally {
+            this.submitScoreBtn.disabled = false;
+            this.submitScoreBtn.textContent = 'SUBMIT';
+        }
+    }
+
+    /**
+     * 重置提交表单 UI 到初始状态
+     */
+    _resetSubmitUI() {
+        if (this.submitArea)    this.submitArea.classList.add('hidden');
+        if (this.submitSuccess) this.submitSuccess.classList.add('hidden');
+        if (this.playerNameInput) {
+            this.playerNameInput.value = '';
+            this.playerNameInput.style.borderColor = '#333';
+            this.playerNameInput.style.boxShadow = 'none';
+        }
+        if (this.submitScoreBtn) {
+            this.submitScoreBtn.disabled = false;
+            this.submitScoreBtn.textContent = 'SUBMIT';
+        }
+    }
+
+    /**
+     * 简单的 HTML 转义（防止 XSS）
+     */
+    _escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     // ========================================================================

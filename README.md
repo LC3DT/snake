@@ -1,8 +1,10 @@
-# 🐍 贪吃蛇 Snake — 增强版
+# 🐍 贪吃蛇 Snake — 全栈增强版
 
-> **技术栈**：HTML5 Canvas + CSS3 (Dark Neon主题) + Vanilla JS (ES6+)
+> **前端**：HTML5 Canvas + CSS3 (Dark Neon主题) + Vanilla JS (ES6+)
 >
-> **零依赖** — 无需任何外部库或框架，纯浏览器原生 API 实现
+> **后端**：Node.js + Express + SQLite (better-sqlite3)
+>
+> **零前端依赖** — 无需任何外部库或框架，纯浏览器原生 API 实现
 
 ---
 
@@ -114,6 +116,26 @@ Layer 4: 洪泛逃生 → 选最大连通方向
 - 虚拟模拟仅深拷贝 ~400 个坐标对（~0.01ms）
 - 完整决策周期 < 0.5ms，远低于 150ms tick 间隔
 
+### 🌐 全球排行榜 (v4.0)
+
+```
+┌─────────────────────────────────┐
+│         全栈架构                  │
+│                                 │
+│  前端 (浏览器)                   │
+│    ↓ fetch()                    │
+│  Node.js + Express              │
+│    ↓ better-sqlite3             │
+│  SQLite (leaderboard.db)        │
+└─────────────────────────────────┘
+```
+
+- 游戏结束后可提交分数到后端服务器
+- 实时 Top 10 排行榜面板（右侧显示）
+- 排行榜自动刷新 — 提交分数后即时更新
+- 首三位分别用 🥇🥈🥉 标记
+- Dark Neon 风格，与游戏主题统一
+
 ---
 
 ## 🎮 操作说明
@@ -133,44 +155,48 @@ Layer 4: 洪泛逃生 → 选最大连通方向
 
 ## 🚀 部署方式
 
-### 方式一：本地直接打开
+### 方式一：纯前端（离线游玩）
 
 ```bash
 # 克隆或下载项目到本地
 git clone <repo-url>
 
 # 直接用浏览器打开 index.html
-# 支持所有现代浏览器（Chrome / Firefox / Edge / Safari）
+# 游戏核心功能完全离线可用（排行榜除外）
 ```
 
 > **注意**：Service Worker (PWA) 需要 HTTP(S) 协议才能注册。
 > 本地直接用 `file://` 打开时，PWA 缓存功能不可用，但游戏本身正常运行。
 
-### 方式二：本地 HTTP 服务器（推荐，支持 PWA）
+### 方式二：完整全栈（推荐，含排行榜）
+
+需要 **Node.js 18+** 环境。
 
 ```bash
-# 使用 Node.js (http-server)
+# 1. 安装后端依赖
+cd server
+npm install
+
+# 2. 启动后端服务（默认端口 3001）
+npm start
+
+# 3. 启动前端静态服务（另一个终端）
+cd ..   # 回到项目根目录
 npx http-server ./ -p 8080 -c-1
+# 或使用 VS Code Live Server
 
-# 或使用 Python
-python -m http.server 8080
-
-# 或使用 VS Code Live Server 扩展
-# 右键 index.html → Open with Live Server
+# 4. 访问 http://localhost:8080
+# 排行榜将自动连接 http://localhost:3001
 ```
 
-然后在浏览器访问 `http://localhost:8080`
+### 方式三：部署到生产环境
 
-### 方式三：部署到托管平台
+| 组件 | 推荐平台 | 说明 |
+|------|---------|------|
+| 前端 (静态文件) | Netlify / Vercel / GitHub Pages | 部署 `index.html` + 资源 |
+| 后端 (API) | Render / Railway / Fly.io | 部署 `server/` 目录 |
 
-| 平台 | 方式 |
-|------|------|
-| GitHub Pages | 推送至 `gh-pages` 分支 |
-| Netlify | 拖拽 `index.html` + 资源文件上传 |
-| Vercel | 直接导入项目目录 |
-| 任意静态服务器 | 复制所有文件到 WWW 目录 |
-
-> 本项目为纯静态前端应用，无需后端服务，任何静态托管平台均可部署。
+> 生产部署时，修改 [`game.js`](game.js:28) 中的 `API_BASE_URL` 为实际后端地址。
 
 ---
 
@@ -178,25 +204,29 @@ python -m http.server 8080
 
 ```
 snake/
-├── index.html          # 入口 HTML — 游戏界面结构
-├── style.css           # Dark Neon 主题样式 + 响应式适配
-├── game.js             # 核心游戏逻辑 (1415 行)
-│   ├── Constants       # 网格/速度/状态常量
-│   ├── AudioManager    # Web Audio API 8-bit 音效
-│   ├── Particle        # 粒子特效
-│   ├── InputHandler    # 键盘/触控 + 指令队列
-│   ├── Snake           # 蛇管理（穿墙/反转）
-│   ├── Item            # 道具系统（4 种类型）
-│   └── Game            # 主控制器（状态机/循环/特效）
-├── ai.js               # AI 自动驾驶 (390 行)
-│   └── AIPlayer        # A* 寻路 + 虚拟预演 + 追尾 + 洪泛
-├── manifest.json       # PWA 清单
-├── sw.js               # Service Worker 缓存策略
-├── README.md           # 本文档
-└── plans/              # 设计文档
-    ├── architecture-plan.md
-    ├── enhancement-plan.md
-    └── ai-autopilot-plan.md
+├── index.html           # 入口 HTML — 游戏界面 + 排行榜面板
+├── style.css            # Dark Neon 主题样式 + 响应式适配
+├── game.js              # 核心游戏逻辑 (≈1500 行)
+│   ├─ Constants         # 网格/速度/状态常量
+│   ├─ AudioManager      # Web Audio API 8-bit 音效
+│   ├─ Particle          # 粒子特效
+│   ├─ InputHandler      # 键盘/触控 + 指令队列
+│   ├─ Snake             # 蛇管理（穿墙/反转）
+│   ├─ Item              # 道具系统（4 种类型）
+│   └─ Game              # 主控制器（状态机/循环/特效/排行榜 API）
+├── ai.js                # AI 自动驾驶 (390 行)
+│   └─ AIPlayer          # A* 寻路 + 虚拟预演 + 追尾 + 洪泛
+├── manifest.json        # PWA 清单
+├── sw.js                # Service Worker 缓存策略
+├── README.md            # 本文档
+├── server/              # 后端服务
+│   ├─ package.json      # 依赖声明
+│   ├─ server.js         # Express 服务 + SQLite API
+│   └─ leaderboard.db    # SQLite 数据库（运行时自动创建）
+└── plans/               # 设计文档
+    ├─ architecture-plan.md
+    ├─ enhancement-plan.md
+    └─ ai-autopilot-plan.md
 ```
 
 ---
@@ -231,7 +261,88 @@ Game ────┬─── Snake          — 蛇的位置/方向/碰撞/绘�
          ├─── AudioManager   — Web Audio API 音效合成
          ├─── AIPlayer       — AI 决策（4 层树）
          ├─── particles[]    — 粒子特效列表
-         └─── effects[]      — 计时效果管理器
+         ├─── effects[]      — 计时效果管理器
+         └─── fetch()        — 排行榜 API 通信
+```
+
+---
+
+## 🌐 API 文档
+
+后端运行在 `http://localhost:3001`，提供以下 RESTful API：
+
+### `POST /api/score` — 提交分数
+
+**Request Body:**
+```json
+{
+  "playerName": "PLAYER_1",
+  "score": 150
+}
+```
+
+**Validation:**
+- `playerName`：3-10 个字符，仅允许字母、数字、下划线
+- `score`：非负整数
+
+**Response (201):**
+```json
+{
+  "id": 1,
+  "playerName": "PLAYER_1",
+  "score": 150
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "playerName must be 3-10 characters (letters, digits, underscores)"
+}
+```
+
+### `GET /api/leaderboard` — 获取排行榜
+
+返回 Top 10 最高分，按分数降序排列，同分按提交时间升序。
+
+**Response (200):**
+```json
+[
+  {
+    "rank": 1,
+    "id": 5,
+    "playerName": "CHAMP",
+    "score": 500,
+    "createdAt": "2026-05-01 10:00:00"
+  },
+  {
+    "rank": 2,
+    "id": 3,
+    "playerName": "ACE",
+    "score": 320,
+    "createdAt": "2026-05-01 09:30:00"
+  }
+]
+```
+
+### `GET /api/health` — 健康检查
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-05-01T10:00:00.000Z"
+}
+```
+
+### 数据库结构 (SQLite)
+
+```sql
+CREATE TABLE scores (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_name TEXT    NOT NULL,
+    score      INTEGER NOT NULL CHECK(score >= 0),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ---
@@ -245,6 +356,7 @@ Game ────┬─── Snake          — 蛇的位置/方向/碰撞/绘�
 - 道具：呼吸光晕 + 内部高光 + 圆角矩形
 - 覆盖层：毛玻璃效果 (`backdrop-filter: blur`)
 - 响应式：支持 480px / 360px 断点
+- 排行榜面板：右侧独立面板，黄金/银/铜色前三名高亮
 
 ---
 
