@@ -69,6 +69,14 @@ export class AudioManager {
     this.playTone('sawtooth', [200, 100, 50], 0.5, 0.3);
   }
 
+  playShieldEat(): void {
+    this.playTone('sine', [880, 1100, 1320], 0.3, 0.25);
+  }
+
+  playGhostEat(): void {
+    this.playTone('sine', [440, 660, 880], 0.35, 0.2);
+  }
+
   /** 根据道具类型播放对应音效 */
   playItemEat(type: ItemType): void {
     switch (type) {
@@ -76,6 +84,8 @@ export class AudioManager {
       case ItemType.GOLDEN: this.playGoldenEat(); break;
       case ItemType.BLUE:   this.playBlueEat();   break;
       case ItemType.PURPLE: this.playPurpleEat();  break;
+      case ItemType.SHIELD: this.playShieldEat();  break;
+      case ItemType.GHOST:  this.playGhostEat();   break;
     }
   }
 }

@@ -38,7 +38,7 @@ export const ITEM_CONFIGS: readonly ItemConfig[] = Object.freeze([
     glow:     'rgba(255,0,68,0.4)',
     points:   10,
     duration: 0,
-    weight:   60,
+    weight:   45,
     label:    '🍎',
   },
   {
@@ -47,7 +47,7 @@ export const ITEM_CONFIGS: readonly ItemConfig[] = Object.freeze([
     glow:     'rgba(255,215,0,0.5)',
     points:   50,
     duration: 5,     // 5 秒后消失
-    weight:   15,
+    weight:   12,
     label:    '⭐',
   },
   {
@@ -56,7 +56,7 @@ export const ITEM_CONFIGS: readonly ItemConfig[] = Object.freeze([
     glow:     'rgba(0,191,255,0.4)',
     points:   0,
     duration: 10,    // 减速 10 秒
-    weight:   15,
+    weight:   12,
     label:    '💧',
   },
   {
@@ -67,6 +67,24 @@ export const ITEM_CONFIGS: readonly ItemConfig[] = Object.freeze([
     duration: 5,     // 反转 5 秒
     weight:   10,
     label:    '☠️',
+  },
+  {
+    type:     ItemType.SHIELD,
+    color:    '#00ff88',
+    glow:     'rgba(0,255,136,0.4)',
+    points:   0,
+    duration: 8,     // 护盾 8 秒
+    weight:   12,
+    label:    '🛡️',
+  },
+  {
+    type:     ItemType.GHOST,
+    color:    '#aa88ff',
+    glow:     'rgba(170,136,255,0.4)',
+    points:   0,
+    duration: 8,     // 幽灵 8 秒
+    weight:   9,
+    label:    '👻',
   },
 ]);
 

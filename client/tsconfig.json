@@ -27,13 +27,7 @@
     "strictBindCallApply": true,
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
-    "alwaysStrict": true,
-
-    /* 路径别名（可选） */
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "alwaysStrict": true
   },
   "include": ["src"]
 }

@@ -61,6 +61,31 @@ html, body {
   gap: 2px;
 }
 
+/* ====== 分隔线 ====== */
+.score-divider {
+  width: 1px;
+  height: 32px;
+  background: #222;
+}
+
+/* ====== HIGH 分特殊颜色 ====== */
+.score-value.high {
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+/* ====== 速度等级 ====== */
+.score-value.speed {
+  color: #00bfff;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+  font-size: 14px;
+}
+
+/* ====== AI / 模式指示器 ====== */
+.ai-mode {
+  font-size: 12px !important;
+}
+
 .score-label {
   font-family: 'Orbitron', monospace;
   font-size: 10px;
@@ -164,6 +189,100 @@ html, body {
 .legend-item {
   font-size: 11px;
   opacity: 0.5;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.legend {
+  font-size: 11px;
+  color: #555;
+}
+
+/* ====== 效果状态面板（右上角） ====== */
+.effects-panel {
+  position: absolute;
+  top: 40px;
+  right: 6px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  min-width: 70px;
+}
+
+.effects-panel.hidden {
+  display: none;
+}
+
+.effect-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-family: 'Orbitron', monospace;
+  backdrop-filter: blur(2px);
+}
+
+.effect-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.effect-bar {
+  display: inline-block;
+  height: 3px;
+  border-radius: 2px;
+  min-width: 20px;
+  max-width: 40px;
+  transition: width 0.3s ease;
+}
+
+.effect-time {
+  color: #aaa;
+  font-size: 9px;
+  min-width: 18px;
+  text-align: right;
+}
+
+/* ====== 蛇图标 ====== */
+.snake-icon {
+  font-size: 64px;
+  line-height: 1;
+  margin-bottom: 8px;
+  animation: snakeFloat 2s ease-in-out infinite;
+}
+
+@keyframes snakeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ====== 最终得分 ====== */
+.final-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  color: #666;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.final-value {
+  font-size: 48px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
 }
 
 /* ====== 覆盖层 ====== */
@@ -524,4 +643,31 @@ kbd {
   .score-value {
     font-size: 14px;
   }
+}
+
+/* ====== 触控操作提示（仅移动端可见） ====== */
+.touch-hint {
+  display: none;
+  text-align: center;
+  font-size: 11px;
+  color: #444;
+  letter-spacing: 2px;
+  margin-top: 4px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-hint {
+    display: block;
+  }
+}
+
+/* ====== 开始界面副标题 ====== */
+.start-subtitle {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.start-subtitle kbd {
+  margin: 0 2px;
 }

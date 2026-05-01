@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   server: {
-    port: 8080,
+    port: 8082,
     // 开发环境下将 /api/ 请求代理到后端
     proxy: {
       '/api': {

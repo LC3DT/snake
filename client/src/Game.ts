@@ -59,6 +59,10 @@ export class Game {
 
   // ---- 活跃效果 ----
   private readonly effects: ActiveEffect[] = [];
+  /** 护盾：免疫一次碰撞 */
+  private shieldActive = false;
+  /** 幽灵模式：临时穿墙 */
+  private ghostActive = false;
 
   // ---- 屏幕震动 ----
   private shakeTime = 0;
@@ -87,6 +91,9 @@ export class Game {
   private readonly submitSuccess: HTMLElement | null;
   private readonly refreshBtn: HTMLElement | null;
 
+  // ---- 效果状态面板 DOM ----
+  private readonly effectsPanel: HTMLElement | null;
+
   constructor() {
     // ---- Canvas ----
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
@@ -109,6 +116,7 @@ export class Game {
     this.newRecordBadge  = document.getElementById('new-record-badge');
     this.wrapToggle      = document.getElementById('wrap-toggle') as HTMLInputElement | null;
     this.aiStatusEl      = document.getElementById('ai-status');
+    this.effectsPanel    = document.getElementById('effects-panel');
 
     this.leaderboardBody = document.getElementById('leaderboard-body');
     this.playerNameInput = document.getElementById('player-name-input') as HTMLInputElement | null;
@@ -189,6 +197,7 @@ export class Game {
 
     // 更新活跃效果
     this._updateEffects(dt);
+    this._updateEffectsUI();
 
     // 只在 PLAYING 状态下执行逻辑更新
     if (this.fsm.state === GameState.PLAYING) {
@@ -217,7 +226,13 @@ export class Game {
 
     // ---- AI 决策 ----
     if (this.ai.isEnabled) {
-      const aiDir = this.ai.decide(this.snake.head, this.snake, this.item.position);
+      let aiDir = this.ai.decide(this.snake.head, this.snake, this.item.position);
+      // 反转效果补偿：AI 计算的是真实移动方向，
+      // 但 reversed 状态下 setDirection 会翻转方向，
+      // 因此需要传入相反方向，让 setDirection 翻回 AI 的意图
+      if (this.snake.reversed) {
+        aiDir = this._oppositeDir(aiDir);
+      }
       this.snake.setDirection(aiDir);
     }
 
@@ -232,7 +247,22 @@ export class Game {
 
     // ---- 穿墙 & 碰撞 ----
     const wallHit = this.snake.checkWallCollision(this.wrapMode);
-    if (wallHit || this.snake.checkSelfCollision()) {
+    const selfHit = this.snake.checkSelfCollision();
+    if (wallHit || selfHit) {
+      // 护盾免疫一次碰撞
+      if (this.shieldActive) {
+        this.shieldActive = false;
+        // 移除护盾效果
+        const idx = this.effects.findIndex(e => e.type === ItemType.SHIELD);
+        if (idx >= 0) this.effects.splice(idx, 1);
+        this.audio.playItemEat(ItemType.SHIELD);
+        // 粒子爆发
+        const cx = this.snake.head.x * CELL_SIZE + CELL_SIZE / 2;
+        const cy = this.snake.head.y * CELL_SIZE + CELL_SIZE / 2;
+        this.particles.burst(cx, cy, '#00ff88', 15);
+        this._updateEffectsUI();
+        return; // 跳过本次移动（不前进）
+      }
       this._onDeath();
       return;
     }
@@ -310,6 +340,8 @@ export class Game {
     this.accumulator = 0;
     this.lastTickTime = 0;
     this.effects.length = 0;
+    this.shieldActive = false;
+    this.ghostActive = false;
     this.particles.clear();
 
     this.snake.reset(SNAKE_START_X, SNAKE_START_Y, INITIAL_SNAKE_LENGTH, INITIAL_SNAKE_DIR);
@@ -321,6 +353,7 @@ export class Game {
     this._updateSpeedDisplay();
     this._applyEffect(ItemType.BLUE, false);   // 清除减速
     this._applyEffect(ItemType.PURPLE, false); // 清除反转
+    this._updateEffectsUI();
   }
 
   // ========================================================================
@@ -409,6 +442,7 @@ export class Game {
     // 应用效果
     if (cfg.duration > 0) {
       this._addEffect(this.item.type, cfg.duration * 1000);
+      this._updateEffectsUI();
     }
   }
 
@@ -438,10 +472,24 @@ export class Game {
   private _applyEffect(type: ItemType, active: boolean): void {
     switch (type) {
       case ItemType.BLUE:
-        // 减速 / 恢复
-        break; // 速度由 _getDynamicInterval 处理
+        // 减速 / 恢复 — 速度由 _getDynamicInterval 处理
+        break;
       case ItemType.PURPLE:
         this.snake.reversed = active;
+        break;
+      case ItemType.SHIELD:
+        this.shieldActive = active;
+        break;
+      case ItemType.GHOST:
+        this.ghostActive = active;
+        // 幽灵模式自动开启穿墙，效果结束恢复用户设置
+        if (active) {
+          this.wrapMode = true;
+          if (this.wrapToggle) this.wrapToggle.checked = true;
+        } else {
+          this.wrapMode = false;
+          if (this.wrapToggle) this.wrapToggle.checked = false;
+        }
         break;
     }
   }
@@ -453,6 +501,33 @@ export class Game {
       interval *= 2;
     }
     return interval;
+  }
+
+  /** 更新右上角效果状态面板 */
+  private _updateEffectsUI(): void {
+    if (!this.effectsPanel) return;
+
+    if (this.effects.length === 0 && !this.shieldActive && !this.ghostActive) {
+      this.effectsPanel.innerHTML = '';
+      this.effectsPanel.classList.add('hidden');
+      return;
+    }
+    this.effectsPanel.classList.remove('hidden');
+
+    const items: string[] = [];
+
+    for (const e of this.effects) {
+      const cfg = getItemConfig(e.type);
+      const remaining = Math.ceil(e.remaining / 1000);
+      const color = cfg.color;
+      items.push(`<div class="effect-item">
+        <span class="effect-icon" style="color:${color}">${cfg.label}</span>
+        <span class="effect-bar" style="background:${color};width:${Math.min(100, (e.remaining / (cfg.duration * 1000)) * 100)}%"></span>
+        <span class="effect-time">${remaining}s</span>
+      </div>`);
+    }
+
+    this.effectsPanel.innerHTML = items.join('');
   }
 
   // ========================================================================
@@ -546,13 +621,13 @@ export class Game {
 
   private async _fetchLeaderboard(): Promise<void> {
     if (!this.leaderboardBody) return;
-    this.leaderboardBody.innerHTML = '<div class="leaderboard-loading">Loading...</div>';
+    this.leaderboardBody.innerHTML = '<div class="leaderboard-loading">加载中...</div>';
 
     try {
       const data = await this.network.fetchLeaderboard();
 
       if (data.length === 0) {
-        this.leaderboardBody.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
+        this.leaderboardBody.innerHTML = '<div class="leaderboard-empty">暂无记录</div>';
         return;
       }
 
@@ -569,8 +644,8 @@ export class Game {
         </div>`;
       }).join('');
     } catch (err) {
-      console.warn('Leaderboard fetch failed:', err);
-      this.leaderboardBody.innerHTML = '<div class="leaderboard-error">⚠ Server offline</div>';
+      console.warn('排行榜获取失败:', err);
+      this.leaderboardBody.innerHTML = '<div class="leaderboard-error">⚠ 服务器离线</div>';
     }
   }
 
@@ -599,19 +674,19 @@ export class Game {
 
       this._fetchLeaderboard();
     } catch (err) {
-      console.warn('Score submit failed:', err);
+      console.warn('分数提交失败:', err);
       const ss = this.submitSuccess;
-      ss.textContent = '⚠ Submit failed, try again';
+      ss.textContent = '⚠ 提交失败，请重试';
       ss.style.color = '#ff0044';
       ss.classList.remove('hidden');
       setTimeout(() => {
-        ss.textContent = '✅ Score submitted!';
+        ss.textContent = '✅ 提交成功！';
         ss.style.color = '#00ff41';
         ss.classList.add('hidden');
       }, 3000);
     } finally {
       this.submitScoreBtn.disabled = false;
-      this.submitScoreBtn.textContent = 'SUBMIT';
+      this.submitScoreBtn.textContent = '提交';
     }
   }
 
@@ -625,7 +700,7 @@ export class Game {
     }
     if (this.submitScoreBtn) {
       this.submitScoreBtn.disabled = false;
-      this.submitScoreBtn.textContent = 'SUBMIT';
+      this.submitScoreBtn.textContent = '提交';
     }
   }
 
@@ -634,23 +709,27 @@ export class Game {
   // ========================================================================
 
   private _updateScoreDisplay(): void {
-    if (this.currentScoreEl) this.currentScoreEl.textContent = String(this.score);
+    if (this.currentScoreEl) {
+      this.currentScoreEl.textContent = String(this.score).padStart(3, '0');
+    }
   }
 
   private _updateHighScoreDisplay(): void {
-    if (this.highScoreEl) this.highScoreEl.textContent = String(this.highScore);
+    if (this.highScoreEl) {
+      this.highScoreEl.textContent = String(this.highScore).padStart(3, '0');
+    }
   }
 
   private _updateSpeedDisplay(): void {
     if (this.speedLevelEl) {
       const level = Math.floor((GAME_CONFIG.maxTickInterval - this.tickInterval) / GAME_CONFIG.speedStep) + 1;
-      this.speedLevelEl.textContent = String(level);
+      this.speedLevelEl.textContent = `Lv.${level}`;
     }
   }
 
   private _updateAIStatus(): void {
     if (this.aiStatusEl) {
-      this.aiStatusEl.textContent = this.ai.isEnabled ? 'AI ON' : 'AI OFF';
+      this.aiStatusEl.textContent = this.ai.isEnabled ? '🤖 自动' : '👤 手动';
       this.aiStatusEl.style.color = this.ai.isEnabled ? '#00ff41' : '#888';
     }
   }
@@ -658,6 +737,17 @@ export class Game {
   // ========================================================================
   //  工具
   // ========================================================================
+
+  /** 获取反方向（用于反转效果补偿） */
+  private _oppositeDir(dir: Direction): Direction {
+    const map: Record<Direction, Direction> = {
+      [Direction.UP]:    Direction.DOWN,
+      [Direction.DOWN]:  Direction.UP,
+      [Direction.LEFT]:  Direction.RIGHT,
+      [Direction.RIGHT]: Direction.LEFT,
+    };
+    return map[dir];
+  }
 
   private _escapeHtml(str: string): string {
     const div = document.createElement('div');

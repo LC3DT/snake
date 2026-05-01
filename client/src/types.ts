@@ -39,6 +39,8 @@ export enum ItemType {
   GOLDEN = 'GOLDEN',
   BLUE   = 'BLUE',
   PURPLE = 'PURPLE',
+  SHIELD = 'SHIELD',
+  GHOST  = 'GHOST',
 }
 
 export interface ItemConfig {

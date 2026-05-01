@@ -15,7 +15,7 @@ import { Snake } from './Snake';
 
 /** 二维 Uint8Array 包装，O(1) 访问 */
 class GridCache {
-  private data: Uint8Array;
+  data: Uint8Array;
   readonly rows: number;
   readonly cols: number;
 
@@ -35,6 +35,16 @@ class GridCache {
 
   get(y: number, x: number): number {
     return this.data[y * this.cols + x] ?? 0;
+  }
+
+  /** 深拷贝当前缓存数据 */
+  snapshot(): Uint8Array {
+    return new Uint8Array(this.data);
+  }
+
+  /** 恢复缓存数据 */
+  restore(saved: Uint8Array): void {
+    this.data = new Uint8Array(saved);
   }
 }
 
@@ -67,8 +77,11 @@ export class AIController {
   decide(head: Point, snake: Snake, food: Point): Direction {
     if (!this.enabled) return snake.direction;
 
+    // ---- 构建障碍物缓存（整 snake.body 标记，与 JS 原版一致） ----
+    this._buildObstacles(snake);
+
     // Layer 1: A* 寻路 → 食物
-    const path = this._aStar(head, food, snake);
+    const path = this._aStar(head, food);
     if (path && path.length > 1) {
       // Layer 2: 虚拟预演
       if (this._simulateEat(path, snake)) {
@@ -78,13 +91,13 @@ export class AIController {
 
     // Layer 3: 追尾
     const tail = snake.tail;
-    const tailPath = this._aStar(head, tail, snake);
+    const tailPath = this._aStar(head, tail);
     if (tailPath && tailPath.length > 1) {
       return this._dirFromPath(head, tailPath);
     }
 
     // Layer 4: 洪泛逃生
-    return this._findSafestDir(head, snake);
+    return this._findSafestDir(head);
   }
 
   /** 从路径中提取第一步方向 */
@@ -99,21 +112,20 @@ export class AIController {
     return Direction.UP;
   }
 
+  /** 构建障碍物缓存：标记所有蛇身为障碍物（与 JS 原版 _buildObstacleMap 一致） */
+  private _buildObstacles(snake: Snake): void {
+    this.obstacles.reset();
+    for (const seg of snake.body) {
+      this.obstacles.set(seg.y, seg.x, 1);
+    }
+  }
+
   // ========================================================================
   //  Layer 1 & 3 — A* 寻路
   // ========================================================================
 
-  private _aStar(start: Point, goal: Point, snake: Snake): Point[] | null {
-    this.obstacles.reset();
-
-    // 标记蛇身为障碍物（排除蛇尾，因为每 tick 尾部会移动）
-    for (let i = 0; i < snake.body.length - 1; i++) {
-      const seg = snake.body[i];
-      if (seg) {
-        this.obstacles.set(seg.y, seg.x, 1);
-      }
-    }
-
+  /** A* 寻路（使用预构建的 obstacles 缓存） */
+  private _aStar(start: Point, goal: Point): Point[] | null {
     // 开放列表：使用数组 + 线性扫描（400 节点网格无需堆优化）
     const open: PathNode[] = [];
     const startNode: PathNode = {
@@ -182,6 +194,7 @@ export class AIController {
   //  模拟沿路径移动并吃到食物后，检查能否存活
   // ========================================================================
 
+  /** 虚拟预演：沿路径模拟吃食物，检查头到尾是否可达（与 JS 原版一致） */
   private _simulateEat(path: Point[], snake: Snake): boolean {
     // 深拷贝蛇身
     const simBody: Point[] = snake.body.map(s => ({ ...s }));
@@ -197,23 +210,28 @@ export class AIController {
       const tail = simSnake.body.pop()!;
       simSnake.body.unshift({ ...p });
 
-      // 到达食物
+      // 到达食物 → 增长（不 pop）
       if (p.x === path[path.length - 1]?.x && p.y === path[path.length - 1]?.y) {
-        simSnake.body.push(tail); // 增长（不 pop）
-      }
-
-      // 碰撞检测（排除蛇尾）
-      const head = simSnake.body[0]!;
-      for (let j = 1; j < simSnake.body.length - 1; j++) {
-        const seg = simSnake.body[j];
-        if (seg && seg.x === head.x && seg.y === head.y) return false;
+        simSnake.body.push(tail);
       }
     }
 
-    // 模拟吃掉后，检查蛇头到蛇尾是否可达
+    // ---- 保存当前障碍物缓存，重建模拟体障碍物 ----
+    const savedObstacles = this.obstacles.snapshot();
+    this.obstacles.reset();
+    for (let i = 0; i < simSnake.body.length - 1; i++) {
+      const seg = simSnake.body[i];
+      if (seg) this.obstacles.set(seg.y, seg.x, 1);
+    }
+
+    // 检查模拟蛇头 → 模拟蛇尾 是否可达
     const simHead = simSnake.body[0]!;
     const simTail = simSnake.body[simSnake.body.length - 1]!;
-    const escapePath = this._aStar(simHead, simTail, simSnake);
+    const escapePath = this._aStar(simHead, simTail);
+
+    // 恢复原始障碍物缓存
+    this.obstacles.restore(savedObstacles);
+
     return escapePath !== null;
   }
 
@@ -222,7 +240,8 @@ export class AIController {
   //  选择连通格子最多的方向
   // ========================================================================
 
-  private _findSafestDir(head: Point, snake: Snake): Direction {
+  /** 比较四个方向的连通区域大小，选最大的方向 */
+  private _findSafestDir(head: Point): Direction {
     const dirs = [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT];
     let bestDir = Direction.UP;
     let bestCount = -1;
@@ -232,9 +251,9 @@ export class AIController {
       const nx = head.x + d.x;
       const ny = head.y + d.y;
       if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
-      if (snake.occupies(nx, ny)) continue;
+      if (this.obstacles.get(ny, nx) !== 0) continue;
 
-      const count = this._floodFill(nx, ny, snake);
+      const count = this._floodFill(nx, ny);
       if (count > bestCount) {
         bestCount = count;
         bestDir = dir;
@@ -244,7 +263,8 @@ export class AIController {
     return bestDir;
   }
 
-  private _floodFill(sx: number, sy: number, snake: Snake): number {
+  /** BFS 洪水填充，计算连通区大小 */
+  private _floodFill(sx: number, sy: number): number {
     this.visited.reset();
     let count = 0;
     const stack: Point[] = [{ x: sx, y: sy }];
@@ -263,7 +283,7 @@ export class AIController {
         const ny = p.y + d.y;
         if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
         if (this.visited.get(ny, nx) !== 0) continue;
-        if (snake.occupies(nx, ny)) continue;
+        if (this.obstacles.get(ny, nx) !== 0) continue;
         this.visited.set(ny, nx, 1);
         stack.push({ x: nx, y: ny });
       }
