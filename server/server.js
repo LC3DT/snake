@@ -1,41 +1,97 @@
 /**
  * ============================================================================
  *  🐍 Snake Leaderboard Server
- *  Node.js + Express + better-sqlite3
+ *  Node.js + Express + sql.js (pure-JS SQLite, no native compilation needed)
  *
  *  Endpoints:
- *    POST /api/score      — Submit a score  { playerName, score }
- *    GET  /api/leaderboard — Get Top 10 scores
+ *    POST /api/score       — Submit a score  { playerName, score }
+ *    GET  /api/leaderboard  — Get Top 10 scores
+ *    GET  /api/health       — Health check
  * ============================================================================
  */
 const express = require('express');
 const cors    = require('cors');
-const Database = require('better-sqlite3');
 const path    = require('path');
+const fs      = require('fs');
+const initSqlJs = require('sql.js');
 
 // ---- App setup ----
-const app  = express();
-const PORT = process.env.PORT || 3001;
+const app     = express();
+const PORT    = process.env.PORT || 3001;
+const DB_PATH = path.join(__dirname, 'leaderboard.db');
 
 // ---- Middleware ----
-app.use(cors());                    // Allow all origins (for dev)
-app.use(express.json());            // Parse JSON request body
+app.use(cors());                  // Allow all origins (for dev)
+app.use(express.json());          // Parse JSON request body
 
-// ---- Database ----
-const db = new Database(path.join(__dirname, 'leaderboard.db'));
+// ---- Database (sql.js) ----
+let db = null;
 
-// Enable WAL mode for better concurrent reads
-db.pragma('journal_mode = WAL');
+/**
+ * Initialise database:
+ *  1. Load sql.js WASM module
+ *  2. If a .db file exists on disk, load from it (persistence across restarts)
+ *  3. Otherwise create a fresh in-memory database
+ *  4. Ensure the scores table exists
+ *  5. Write the initial state to disk
+ */
+async function initDb() {
+    const SQL = await initSqlJs();
 
-// Create scores table if not exists
-db.exec(`
-    CREATE TABLE IF NOT EXISTS scores (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        player_name TEXT    NOT NULL,
-        score      INTEGER NOT NULL CHECK(score >= 0),
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
+    if (fs.existsSync(DB_PATH)) {
+        const buffer = fs.readFileSync(DB_PATH);
+        db = new SQL.Database(buffer);
+        console.log('  Loaded existing database from', DB_PATH);
+    } else {
+        db = new SQL.Database();
+        console.log('  Created new in-memory database');
+    }
+
+    // Enable WAL-like durability by running pragmas
+    db.run('PRAGMA journal_mode = MEMORY');
+
+    // Create scores table if not exists
+    db.run(`
+        CREATE TABLE IF NOT EXISTS scores (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_name TEXT    NOT NULL,
+            score       INTEGER NOT NULL CHECK(score >= 0),
+            created_at  DATETIME DEFAULT (datetime('now'))
+        )
+    `);
+
+    // Persist to disk so the file exists on first run
+    persistDb();
+}
+
+/** Write the current DB state to disk */
+function persistDb() {
+    const data = db.export();              // returns Uint8Array
+    fs.writeFileSync(DB_PATH, Buffer.from(data));
+}
+
+// ---- Helper: run a parameterised query & return all result rows as objects ----
+function queryAll(sql, params = []) {
+    const stmt = db.prepare(sql);
+    if (params.length > 0) stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) {
+        rows.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return rows;
+}
+
+// ---- Helper: run a single INSERT/UPDATE/DELETE, return lastInsertRowid ----
+function runInsert(sql, params = []) {
+    const stmt = db.prepare(sql);
+    if (params.length > 0) stmt.bind(params);
+    stmt.run();
+    // Retrieve the last inserted rowid
+    const row = queryAll('SELECT last_insert_rowid() AS id')[0];
+    stmt.free();
+    return row ? row.id : null;
+}
 
 // ---- API Routes ----
 
@@ -63,11 +119,16 @@ app.post('/api/score', (req, res) => {
         }
 
         // --- Insert ---
-        const stmt = db.prepare('INSERT INTO scores (player_name, score) VALUES (?, ?)');
-        const result = stmt.run(playerName, scoreNum);
+        const id = runInsert(
+            'INSERT INTO scores (player_name, score) VALUES (?, ?)',
+            [playerName, scoreNum]
+        );
+
+        // Persist to disk after each write
+        persistDb();
 
         return res.status(201).json({
-            id: result.lastInsertRowid,
+            id,
             playerName,
             score: scoreNum,
         });
@@ -84,12 +145,12 @@ app.post('/api/score', (req, res) => {
  */
 app.get('/api/leaderboard', (req, res) => {
     try {
-        const rows = db.prepare(`
+        const rows = queryAll(`
             SELECT id, player_name, score, created_at
             FROM scores
             ORDER BY score DESC, created_at ASC
             LIMIT 10
-        `).all();
+        `);
 
         const leaderboard = rows.map((row, index) => ({
             rank:       index + 1,
@@ -112,8 +173,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // ---- Start server ----
-app.listen(PORT, () => {
-    console.log(`🐍 Snake leaderboard server running at http://localhost:${PORT}`);
-    console.log(`   POST /api/score     — Submit a score`);
-    console.log(`   GET  /api/leaderboard — Top 10 leaderboard`);
+initDb().then(() => {
+    app.listen(PORT, () => {
+        console.log(`🐍 Snake leaderboard server running at http://localhost:${PORT}`);
+        console.log(`   POST /api/score       — Submit a score`);
+        console.log(`   GET  /api/leaderboard  — Top 10 leaderboard`);
+        console.log(`   Database file: ${DB_PATH}`);
+    });
+}).catch(err => {
+    console.error('Failed to initialise database:', err);
+    process.exit(1);
 });
